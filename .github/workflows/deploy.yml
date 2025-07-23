@@ -1,0 +1,60 @@
+name: 🚀 Deploy Spring Boot App (Local Test)
+
+on:
+  push:
+    branches: [main] # Will run only when code is pushed or merged into main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v3
+
+      # 2. Setup Java & Maven
+      - name: 🔧 Set up JDK 19
+        uses: actions/setup-java@v3
+        with:
+          java-version: "19"
+          distribution: "temurin"
+
+      # 3. Build with Maven
+      - name: 🛠️ Build JAR using Maven
+        run: mvn clean package
+
+      # 4. Extract Version Info
+      - name: 🏷️ Generate Version Info
+        id: versioning
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          echo "VERSION=$COMMIT_HASH-$TIMESTAMP" >> $GITHUB_ENV
+          echo "VERSION_FILE=VERSION=$COMMIT_HASH-$TIMESTAMP" > .env.production
+
+      # 5. Copy JAR + env to server (LOCALHOST via SSH)
+      - name: 📂 Deploy to Physical Server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            set -e
+            APP_DIR='C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app'
+            BACKUP_DIR=\"\$APP_DIR/backup\"
+            CURRENT_DIR=\"\$APP_DIR/current\"
+            TIMESTAMP=$(date +\"%Y%m%d%H%M%S\")
+
+            mkdir -p \"\$BACKUP_DIR\" \"\$CURRENT_DIR\"
+
+            if [ -f \"\$CURRENT_DIR/backend.jar\" ]; then
+              mv \"\$CURRENT_DIR/backend.jar\" \"\$BACKUP_DIR/backend-\$TIMESTAMP.jar\"
+            fi
+
+            if [ -f \"\$CURRENT_DIR/.env.production\" ]; then
+              mv \"\$CURRENT_DIR/.env.production\" \"\$BACKUP_DIR/.env.production-\$TIMESTAMP\"
+            fi
+          "
+
+      - name: 📤 Transfer JAR and .env.production
+        run: |
+          scp target/*.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:"C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app/current/backend.jar"
+          scp .env.production ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:"C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app/current/.env.production"
