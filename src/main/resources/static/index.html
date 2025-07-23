@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Spring Boot API Tester</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        background-color: #f2f2f2;
+      }
+      h2 {
+        color: #333;
+      }
+      textarea {
+        width: 100%;
+        height: 120px;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      button {
+        margin-top: 10px;
+        padding: 10px 20px;
+        background-color: #007acc;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      pre {
+        margin-top: 20px;
+        background: #fff;
+        padding: 10px;
+        border-left: 4px solid #007acc;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>POST /login API</h2>
+
+    <p>Enter JSON:</p>
+    <textarea id="jsonInput">
+{
+  "username": "string",
+  "password": "string"
+}
+    </textarea>
+    <br />
+    <button onclick="callApi()">Run</button>
+
+    <h3>Response:</h3>
+    <pre id="responseOutput">...</pre>
+
+    <script>
+      function callApi() {
+        let inputText = document.getElementById("jsonInput").value;
+
+        let jsonData;
+        try {
+          jsonData = JSON.parse(inputText);
+        } catch (e) {
+          document.getElementById("responseOutput").innerText =
+            "❌ Invalid JSON format";
+          return;
+        }
+
+        fetch("/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(jsonData),
+        })
+          .then((res) => res.text())
+          .then((data) => {
+            document.getElementById("responseOutput").innerText = `✅ ${data}`;
+          })
+          .catch((err) => {
+            document.getElementById("responseOutput").innerText =
+              "❌ Error calling API";
+            console.error(err);
+          });
+      }
+    </script>
+  </body>
+</html>
