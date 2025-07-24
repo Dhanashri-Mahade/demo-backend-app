@@ -2,74 +2,87 @@ name: 🚀 Deploy Spring Boot App to GCP VPS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  deploy:
+  build-backup-deploy:
     runs-on: ubuntu-latest
 
-    env:
-      JAR_NAME: backend-${{ github.sha }}-${{ steps.build_time.outputs.time }}.jar
-
     steps:
-      - name: 📦 Checkout Code
+      # Step 1: Checkout code
+      - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
-      - name: 🕒 Set Build Timestamp
-        id: build_time
-        run: echo "time=$(date +'%Y-%m-%d_%H-%M-%S')" >> "$GITHUB_OUTPUT"
+      # Step 2: Setup JDK for Maven build
+      - name: ☕ Set up JDK 19
+        uses: actions/setup-java@v3
+        with:
+          java-version: '19'
+          distribution: 'temurin'
 
-      - name: 🧪 Set Commit Hash
-        id: vars
-        run: echo "commit_hash=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      # Step 3: Build the Spring Boot JAR
+      - name: 🛠 Build JAR using Maven
+        run: mvn clean package
 
-      - name: ☕ Build Spring Boot App
-        run: mvn clean package -DskipTests
-
-      - name: 📂 Create dist Directory
+      # Step 4: Generate version info and .env.production
+      - name: 🏷 Create .env.production with version info
+        id: versioning
         run: |
-          mkdir -p dist
-          cp target/*.jar dist/${{ env.JAR_NAME }}
-          echo "GIT_COMMIT_HASH=${{ steps.vars.outputs.commit_hash }}" > dist/.env.production
-          echo "BUILD_TIME=${{ steps.build_time.outputs.time }}" >> dist/.env.production
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          VERSION="$COMMIT_HASH-$TIMESTAMP"
+          echo "version=$COMMIT_HASH" > .env.production
+          echo "timestamp=$TIMESTAMP" >> .env.production
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: 🔑 Setup GCP Credentials
+      # Step 5: Authenticate gcloud using service account key
+      - name: 🔐 Set up gcloud auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY_JSON }}'
 
-      - name: ☁️ Upload to GCS Current Bucket
+      # Step 6: Upload JAR and .env.production to GCS Buckets
+      - name: ☁ Upload to GCS Buckets
         uses: google-github-actions/upload-cloud-storage@v1
         with:
-          path: dist/
-          destination: ${{ secrets.GCP_BUCKET_CURRENT }}
+          path: target/*.jar
+          destination: '${{ secrets.GCP_BUCKET_CURRENT }}'
           parent: false
 
-      - name: ☁️ Upload to GCS Backup Bucket
+      - name: ☁ Upload .env.production to CURRENT bucket
         uses: google-github-actions/upload-cloud-storage@v1
         with:
-          path: dist/
-          destination: ${{ secrets.GCP_BUCKET_BACKUP }}
+          path: .env.production
+          destination: '${{ secrets.GCP_BUCKET_CURRENT }}'
           parent: false
 
-      - name: 🔐 Setup SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.GCP_VPS_HOST }} >> ~/.ssh/known_hosts
+      - name: ☁ Upload backup to BACKUP bucket
+        uses: google-github-actions/upload-cloud-storage@v1
+        with:
+          path: target/*.jar
+          destination: '${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar'
+          parent: false
 
-      - name: 🚀 Deploy to VPS via SSH
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_VPS_USER }}@${{ secrets.GCP_VPS_HOST }} << EOF
-            mkdir -p ~/app/current ~/app/backup
-            mv ~/app/current/*.jar ~/app/backup/ 2>/dev/null || true
-            mv ~/app/current/.env.production ~/app/backup/ 2>/dev/null || true
+      # Step 7: Connect to VPS and deploy
+      - name: 🚀 Deploy on GCP VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VPS_HOST }}
+          username: ${{ secrets.GCP_VPS_USER }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          script: |
+            echo "📁 Moving to app directory..."
+            cd ~/app
 
-            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/${{ env.JAR_NAME }} ~/app/current/
-            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production ~/app/current/
+            echo "📦 Stopping old app if running..."
+            pkill -f 'java -jar' || echo "App was not running."
 
-            cd ~/app/current
-            nohup java -jar ${{ env.JAR_NAME }} > app.log 2>&1 &
-          EOF
+            echo "🧹 Cleaning old .jar and .env.production..."
+            rm -f app.jar .env.production
+
+            echo "⬇️ Downloading new .jar and .env.production from GCS..."
+            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/*.jar app.jar
+            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production .
+
+            echo "🚀 Starting new app..."
+            nohup java -jar app.jar > output.log 2>&1 &
