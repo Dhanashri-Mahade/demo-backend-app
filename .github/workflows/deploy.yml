@@ -20,11 +20,24 @@ jobs:
           java-version: '19'
           distribution: 'temurin'
 
-      # Step 3: Build the Spring Boot JAR
+      # Step 3: Build JAR using Maven
       - name: 🛠 Build JAR using Maven
-        run: mvn clean package
+        run: |
+          mvn clean package -X  # -X for debug output
+          ls -la target/  # List contents of target/ to verify JAR
 
-      # Step 4: Generate version info and .env.production
+      # Step 4: Verify JAR file exists
+      - name: 🔍 Verify JAR file
+        run: |
+          if [ ! -f target/*.jar ]; then
+            echo "Error: No JAR file found in target/"
+            exit 1
+          fi
+          JAR_FILE=$(ls target/*.jar)
+          echo "Found JAR: $JAR_FILE"
+          echo "JAR_FILE=$JAR_FILE" >> $GITHUB_ENV
+
+      # Step 5: Generate version info and .env.production
       - name: 🏷 Create .env.production with version info
         id: versioning
         run: |
@@ -35,35 +48,34 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> .env.production
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Step 5: Authenticate gcloud using service account key
+      # Step 6: Authenticate gcloud using service account key
       - name: 🔐 Set up gcloud auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY_JSON }}'
 
-      # Step 6: Upload JAR and .env.production to GCS Buckets
-      - name: ☁ Upload to GCS Buckets
-        uses: google-github-actions/upload-cloud-storage@v1
+      # Step 7: Set up gcloud SDK
+      - name: 🛠 Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
         with:
-          path: target/*.jar
-          destination: '${{ secrets.GCP_BUCKET_CURRENT }}'
-          parent: false
+          project_id: qwiklabs-gcp-00-3e843e9d43d6
 
-      - name: ☁ Upload .env.production to CURRENT bucket
-        uses: google-github-actions/upload-cloud-storage@v1
-        with:
-          path: .env.production
-          destination: '${{ secrets.GCP_BUCKET_CURRENT }}'
-          parent: false
+      # Step 8: Upload JAR to GCS Current Bucket
+      - name: ☁ Upload JAR to GCS Current Bucket
+        run: |
+          gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar
 
-      - name: ☁ Upload backup to BACKUP bucket
-        uses: google-github-actions/upload-cloud-storage@v1
-        with:
-          path: target/*.jar
-          destination: '${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar'
-          parent: false
+      # Step 9: Upload .env.production to GCS Current Bucket
+      - name: ☁ Upload .env.production to GCS Current Bucket
+        run: |
+          gsutil cp .env.production gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production
 
-      # Step 7: Connect to VPS and deploy
+      # Step 10: Upload JAR to GCS Backup Bucket
+      - name: ☁ Upload JAR to GCS Backup Bucket
+        run: |
+          gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar
+
+      # Step 11: Deploy to GCP VPS via SSH
       - name: 🚀 Deploy on GCP VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -72,6 +84,7 @@ jobs:
           key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
           script: |
             echo "📁 Moving to app directory..."
+            mkdir -p ~/app
             cd ~/app
 
             echo "📦 Stopping old app if running..."
@@ -81,7 +94,7 @@ jobs:
             rm -f app.jar .env.production
 
             echo "⬇️ Downloading new .jar and .env.production from GCS..."
-            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/*.jar app.jar
+            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar app.jar
             gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production .
 
             echo "🚀 Starting new app..."
