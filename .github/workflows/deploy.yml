@@ -1,73 +1,84 @@
-name: 🚀 Deploy Spring Boot App to GCP (Cloud + VPS)
+name: 🚀 Deploy Spring Boot App to GCP VPS
 
 on:
   push:
     branches: [main]
 
 jobs:
-  build-deploy:
+  build-upload-deploy:
     runs-on: ubuntu-latest
 
+    env:
+      VERSION: backend-${{ github.sha::7 }}-${{ github.run_started_at }}
+
     steps:
-      - name: 📦 Checkout Repository
+      # Step 1: Checkout code
+      - name: 📦 Checkout Code
         uses: actions/checkout@v3
 
-      - name: ☕ Set up JDK 19
+      # Step 2: Set up Java
+      - name: ☕ Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '19'
+          java-version: '17'
 
-      - name: 🛠 Build Spring Boot JAR
-        run: mvn clean package
-
-      - name: 🏷️ Generate .env.production with version info
-        id: versioning
+      # Step 3: Build JAR
+      - name: 🛠️ Build Spring Boot JAR
         run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-          echo "version=$COMMIT_HASH" > .env.production
-          echo "timestamp=$TIMESTAMP" >> .env.production
-          echo "VERSION=$COMMIT_HASH-$TIMESTAMP" >> $GITHUB_ENV
+          mvn clean package -DskipTests
+          mkdir -p dist
+          cp target/*.jar dist/${{ env.VERSION }}.jar
 
-      - name: 📁 Rename JAR with version
+      # Step 4: Create .env.production with version info
+      - name: 📝 Generate .env.production
         run: |
-          mkdir dist
-          cp target/*.jar dist/backend-${{ env.VERSION }}.jar
-          cp .env.production dist/
+          echo "APP_VERSION=${{ env.VERSION }}" > dist/.env.production
 
-      - name: ☁️ Upload to GCP Backup Bucket
+      # Step 5: Authenticate to Google Cloud
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_JSON }}
+
+      # Step 6: Upload JAR and .env to BACKUP bucket
+      - name: ☁️ Upload to GCS Backup Bucket
         uses: google-github-actions/upload-cloud-storage@v1
         with:
           path: dist/
-          destination: ${{ secrets.GCP_BUCKET_BACKUP }}
-          credentials: ${{ secrets.GCP_SA_KEY_JSON }}
+          destination: ${{ secrets.GCP_BUCKET_BACKUP }}/dist
+          parent: false
+          process_gcloudignore: false
 
-      - name: ☁️ Upload to GCP Current Bucket
+      # Step 7: Upload JAR and .env to CURRENT bucket
+      - name: ☁️ Upload to GCS Current Bucket
         uses: google-github-actions/upload-cloud-storage@v1
         with:
           path: dist/
-          destination: ${{ secrets.GCP_BUCKET_CURRENT }}
-          credentials: ${{ secrets.GCP_SA_KEY_JSON }}
+          destination: ${{ secrets.GCP_BUCKET_CURRENT }}/dist
+          parent: false
+          process_gcloudignore: false
 
-      - name: 📂 Copy Files to VPS via SSH
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.GCP_VPS_HOST }}
-          username: ${{ secrets.GCP_VPS_USER }}
-          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
-          source: "dist/*"
-          target: "~/app"
+      # Step 8: Set up SSH key for VPS access
+      - name: 🔑 Set up SSH for VPS
+        run: |
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
 
-      - name: 🔁 Restart Spring Boot App on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.GCP_VPS_HOST }}
-          username: ${{ secrets.GCP_VPS_USER }}
-          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/app
-            echo "✅ Deploying backend-${{ env.VERSION }}.jar"
-            pkill -f 'java -jar' || echo "⚠️ No process found, starting fresh."
-            nohup java -jar backend-${{ env.VERSION }}.jar --spring.config.location=.env.production > app.log 2>&1 &
-            echo "✅ App restarted with version: ${{ env.VERSION }}"
+      # Step 9: SSH into VPS and deploy
+      - name: 🚀 Deploy to GCP VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.GCP_VPS_USER }}@${{ secrets.GCP_VPS_HOST }} << 'EOF'
+            set -e
+            echo "📁 Making app directory"
+            mkdir -p ~/springboot-app/dist
+
+            echo "⬇️ Downloading JAR and .env from GCS"
+            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/dist/*.jar ~/springboot-app/dist/app.jar
+            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/dist/.env.production ~/springboot-app/dist/.env.production
+
+            echo "🔁 Restarting application (simple kill & run)"
+            pkill -f 'java -jar' || true
+            nohup java -jar ~/springboot-app/dist/app.jar --spring.config.location=file:~/springboot-app/dist/.env.production > ~/springboot-app/app.log 2>&1 &
+            echo "✅ Deployment Complete"
+          EOF
