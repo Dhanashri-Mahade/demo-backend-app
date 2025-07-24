@@ -1,32 +1,28 @@
-name: 🚀 Deploy Spring Boot App (Local Test + GitHub Backup)
+name: 🚀 Deploy Spring Boot App (GitHub Backup Only)
 
 on:
   push:
-    branches: [main] # Trigger on main branch only
+    branches: [main]
 
 jobs:
   build-deploy-backup:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Code
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: true # Required for pushing to another branch
+          persist-credentials: true
 
-      # 2. Setup Java & Maven
       - name: 🔧 Set up JDK 19
         uses: actions/setup-java@v3
         with:
           java-version: "19"
           distribution: "temurin"
 
-      # 3. Build Spring Boot App
       - name: 🛠️ Build JAR using Maven
         run: mvn clean package
 
-      # 4. Generate .env.production with version and timestamp
       - name: 🏷️ Create .env.production
         id: versioning
         run: |
@@ -36,33 +32,9 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> .env.production
           echo "VERSION=$COMMIT_HASH-$TIMESTAMP" >> $GITHUB_ENV
 
-      # 5. Deploy to Local Physical Server
-      - name: 📂 Backup old & deploy new on Localhost
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-            set -e
-            APP_DIR='C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app'
-            BACKUP_DIR=\"\$APP_DIR/backup\"
-            CURRENT_DIR=\"\$APP_DIR/current\"
-            TIMESTAMP=$(date +\"%Y%m%d%H%M%S\")
+      # ⛔ Step Removed: Deployment to Windows Localhost
 
-            mkdir -p \"\$BACKUP_DIR\" \"\$CURRENT_DIR\"
-
-            if [ -f \"\$CURRENT_DIR/backend.jar\" ]; then
-              mv \"\$CURRENT_DIR/backend.jar\" \"\$BACKUP_DIR/backend-\$TIMESTAMP.jar\"
-            fi
-
-            if [ -f \"\$CURRENT_DIR/.env.production\" ]; then
-              mv \"\$CURRENT_DIR/.env.production\" \"\$BACKUP_DIR/.env.production-\$TIMESTAMP\"
-            fi
-          "
-
-      - name: 📤 Transfer JAR and .env.production
-        run: |
-          scp target/*.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:"C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app/current/backend.jar"
-          scp .env.production ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:"C:/Users/mahen/OneDrive/Desktop/dhanashri/siliconmount/demo-app/current/.env.production"
-
-      # 6. 🔁 Push backup files to `backup` branch
+      # ✅ Only GitHub Backup to `backup` branch
       - name: 🔁 Push to backup branch on GitHub
         run: |
           git config user.name "github-actions"
