@@ -1,30 +1,30 @@
-name: 🚀 Deploy Spring Boot App (GitHub Backup Only)
+name: ☁️ Deploy Spring Boot App to Google Cloud
 
 on:
   push:
     branches: [main]
 
 jobs:
-  build-deploy-backup:
+  build-upload-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to push to backup branch
 
     steps:
+      # 1. Checkout Code
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }} # ✅ Use GitHub token for pushing
 
-      - name: 🔧 Set up JDK 19
+      # 2. Setup Java
+      - name: ☕ Set up JDK 19
         uses: actions/setup-java@v3
         with:
           java-version: "19"
           distribution: "temurin"
 
-      - name: 🛠️ Build JAR using Maven
+      # 3. Build JAR
+      - name: 🛠️ Build Spring Boot App
         run: mvn clean package
 
+      # 4. Generate .env.production with version info
       - name: 🏷️ Create .env.production
         id: versioning
         run: |
@@ -34,19 +34,63 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> .env.production
           echo "VERSION=$COMMIT_HASH-$TIMESTAMP" >> $GITHUB_ENV
 
-      - name: 🔁 Push to backup branch on GitHub
-        run: |
-          git config user.name "Dhanashri-Mahade"
-          git config user.email "dhanashrimahade@gmail.com"
+      # 5. Authenticate with Google Cloud
+      - name: 🔐 Authenticate with GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_JSON }}
 
-          mkdir temp-backup
-          cp target/*.jar temp-backup/backend-${{ env.VERSION }}.jar
-          cp .env.production temp-backup/
+      # 6. Upload to springboot-current bucket
+      - name: 📤 Upload to Current Bucket
+        uses: google-github-actions/upload-cloud-storage@v1
+        with:
+          path: |
+            target/*.jar
+            .env.production
+          destination: ${{ secrets.GCP_BUCKET_CURRENT }}
+          parent: false
 
-          git fetch origin
-          git switch backup
+      # 7. Upload to springboot-backup bucket (versioned)
+      - name: 🗂️ Upload to Backup Bucket
+        uses: google-github-actions/upload-cloud-storage@v1
+        with:
+          path: target/*.jar
+          destination: ${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar
+          parent: false
 
-          cp temp-backup/* ./
-          git add backend-${{ env.VERSION }}.jar .env.production
-          git commit -m "🔁 Backup - ${{ env.VERSION }}" || echo "Nothing to commit"
-          git push origin backup
+      - name: 🗂️ Upload .env to Backup Bucket
+        uses: google-github-actions/upload-cloud-storage@v1
+        with:
+          path: .env.production
+          destination: ${{ secrets.GCP_BUCKET_BACKUP }}/env-${{ env.VERSION }}.production
+          parent: false
+
+      # 8. SSH into GCP VPS and deploy
+      - name: 🚀 Deploy to Google Cloud VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VPS_HOST }}
+          username: ${{ secrets.GCP_VPS_USER }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          script: |
+            # Install gsutil if not present
+            if ! command -v gsutil &> /dev/null; then
+              echo "Installing gsutil..."
+              sudo apt-get update
+              sudo apt-get install -y python3-pip
+              pip3 install gsutil
+            fi
+
+            mkdir -p ~/app
+            cd ~/app
+
+            echo "🧹 Cleaning old files..."
+            rm -f backend.jar .env.production
+
+            echo "⬇️ Downloading JAR and .env from GCS..."
+            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/*.jar backend.jar
+            gsutil cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production .env.production
+
+            echo "🔁 Restarting Spring Boot App..."
+            pkill -f 'java -jar' || true
+            nohup java -jar backend.jar > app.log 2>&1 &
