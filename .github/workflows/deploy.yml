@@ -8,13 +8,13 @@ jobs:
   build-deploy-backup:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 👈 Required to push to backup branch
+      contents: write # Required to push to backup branch
 
     steps:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: false # 👈 Disable default credentials
+          token: ${{ secrets.GITHUB_TOKEN }} # ✅ Use GitHub token for pushing
 
       - name: 🔧 Set up JDK 19
         uses: actions/setup-java@v3
@@ -34,7 +34,6 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> .env.production
           echo "VERSION=$COMMIT_HASH-$TIMESTAMP" >> $GITHUB_ENV
 
-      # ✅ Push backup JAR + .env.production to `backup` branch
       - name: 🔁 Push to backup branch on GitHub
         run: |
           git config user.name "Dhanashri-Mahade"
@@ -51,5 +50,3 @@ jobs:
           git add backend-${{ env.VERSION }}.jar .env.production
           git commit -m "🔁 Backup - ${{ env.VERSION }}" || echo "Nothing to commit"
           git push origin backup
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 👈 Use token explicitly
