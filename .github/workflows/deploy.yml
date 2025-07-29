@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
     types: [closed]
-  workflow_dispatch: # Adds manual trigger still need to modify
+  workflow_dispatch: # Adds manual trigger need to modify
 
 jobs:
   build-backup-deploy:
