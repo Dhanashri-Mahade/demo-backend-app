@@ -3,22 +3,31 @@ name: 🚀 Deploy Spring Boot App to GCP VPS
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch: # Adds manual trigger
 
 jobs:
   build-backup-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push to backup branch
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     steps:
       # Step 1: Checkout code
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Use GitHub token for pushing
 
       # Step 2: Setup JDK for Maven build
       - name: ☕ Set up JDK 19
         uses: actions/setup-java@v3
         with:
-          java-version: '19'
-          distribution: 'temurin'
+          java-version: "19"
+          distribution: "temurin"
 
       # Step 3: Build JAR using Maven
       - name: 🛠 Build JAR using Maven
@@ -48,34 +57,52 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> .env.production
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Step 6: Authenticate gcloud using service account key
+      # Step 6: Push to backup branch on GitHub
+      - name: 🔁 Push to backup branch on GitHub
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+          mkdir temp-backup
+          cp ${{ env.JAR_FILE }} temp-backup/backend-${{ env.VERSION }}.jar
+          cp .env.production temp-backup/
+
+          git fetch origin
+          git switch backup || git checkout -b backup
+
+          cp temp-backup/* ./
+          git add backend-${{ env.VERSION }}.jar .env.production
+          git commit -m "🔁 Backup - ${{ env.VERSION }}" || echo "Nothing to commit"
+          git push origin backup --force
+
+      # Step 7: Authenticate gcloud using service account key
       - name: 🔐 Set up gcloud auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY_JSON }}'
+          credentials_json: "${{ secrets.GCP_SA_KEY_JSON }}"
 
-      # Step 7: Set up gcloud SDK
+      # Step 8: Set up gcloud SDK
       - name: 🛠 Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: qwiklabs-gcp-00-3e843e9d43d6
+          project_id: qwiklabs-gcp-02-d4225d7a2f67
 
-      # Step 8: Upload JAR to GCS Current Bucket
+      # Step 9: Upload JAR to GCS Current Bucket
       - name: ☁ Upload JAR to GCS Current Bucket
         run: |
           gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar
 
-      # Step 9: Upload .env.production to GCS Current Bucket
+      # Step 10: Upload .env.production to GCS Current Bucket
       - name: ☁ Upload .env.production to GCS Current Bucket
         run: |
           gsutil cp .env.production gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production
 
-      # Step 10: Upload JAR to GCS Backup Bucket
+      # Step 11: Upload JAR to GCS Backup Bucket
       - name: ☁ Upload JAR to GCS Backup Bucket
         run: |
           gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar
 
-      # Step 11: Deploy to GCP VPS via SSH
+      # Step 12: Deploy to GCP VPS via SSH
       - name: 🚀 Deploy on GCP VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
