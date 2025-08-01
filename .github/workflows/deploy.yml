@@ -102,27 +102,27 @@ jobs:
         run: |
           gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_BACKUP }}/backend-${{ env.VERSION }}.jar
 
-      # Step 12: Deploy to GCP VPS via SSH
-      - name: 🚀 Deploy on GCP VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.GCP_VPS_HOST }}
-          username: ${{ secrets.GCP_VPS_USER }}
-          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
-          script: |
-            echo "📁 Moving to app directory..."
-            mkdir -p ~/app
-            cd ~/app
+      # # Step 12: Deploy to GCP VPS via SSH
+      # - name: 🚀 Deploy on GCP VPS via SSH
+      #   uses: appleboy/ssh-action@v1.0.3
+      #   with:
+      #     host: ${{ secrets.GCP_VPS_HOST }}
+      #     username: ${{ secrets.GCP_VPS_USER }}
+      #     key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+      #     script: |
+      #       echo "📁 Moving to app directory..."
+      #       mkdir -p ~/app
+      #       cd ~/app
 
-            echo "📦 Stopping old app if running..."
-            pkill -f 'java -jar' || echo "App was not running."
+      #       echo "📦 Stopping old app if running..."
+      #       pkill -f 'java -jar' || echo "App was not running."
 
-            echo "🧹 Cleaning old .jar and .env.production..."
-            rm -f app.jar .env.production
+      #       echo "🧹 Cleaning old .jar and .env.production..."
+      #       rm -f app.jar .env.production
 
-            echo "⬇️ Downloading new .jar and .env.production from GCS..."
-            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar app.jar
-            gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production .
+      #       echo "⬇️ Downloading new .jar and .env.production from GCS..."
+      #       gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar app.jar
+      #       gcloud storage cp gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production .
 
-            echo "🚀 Starting new app..."
-            nohup java -jar app.jar > output.log 2>&1 &
+      #       echo "🚀 Starting new app..."
+      #       nohup java -jar app.jar > output.log 2>&1 &
