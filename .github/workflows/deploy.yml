@@ -85,7 +85,7 @@ jobs:
       - name: 🛠 Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: qwiklabs-gcp-02-d4225d7a2f67
+          project_id: qwiklabs-gcp-04-ad8958c0a00d
 
       # Step 9: Upload JAR to GCS Current Bucket
       - name: ☁ Upload JAR to GCS Current Bucket
