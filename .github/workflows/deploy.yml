@@ -92,7 +92,7 @@ jobs:
         run: |
           gsutil cp ${{ env.JAR_FILE }} gs://${{ secrets.GCP_BUCKET_CURRENT }}/app.jar
 
-      # Step 10: Upload .env.production to GCS Current Bucket
+      # Step 10: Upload .env.production to Current app storage Bucket
       - name: ☁ Upload .env.production to GCS Current Bucket
         run: |
           gsutil cp .env.production gs://${{ secrets.GCP_BUCKET_CURRENT }}/.env.production
