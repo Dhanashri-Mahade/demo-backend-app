@@ -1,62 +1,40 @@
-name: Deploy Spring Boot App to Windows Server
+name: Deploy App to Local Machine
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-    types: [closed]
-  workflow_dispatch: # Adds manual trigger
+    branches:
+      - main  # Change to your deployment branch
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
+      # Step 1: Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2. Set up JDK
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      # 3. Build JAR
-      - name: Build JAR
-        run: mvn clean package -DskipTests
-
-      # 4. Upload to Windows server via SSH
-      - name: Deploy to Windows Server
+      # Step 2: Upload JAR to your machine via SCP
+      - name: Upload JAR to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.LOCAL_HOST }}
-          username: ${{ secrets.LOCAL_USER }}
-          key: ${{ secrets.LOCAL_SSH_KEY }}
-          source: "target/*.jar"
-          target: ${{ secrets.TARGET_FOLDER }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          source: "target/your-app.jar"
+          target: "~/app/backup/app-$(date +'%Y-%m-%d').jar"
 
-      # 5. Backup JAR in backup folder with date in filename
-      - name: Backup JAR on Windows
-        uses: appleboy/ssh-action@v1.2.0
+      # Step 3: SSH to server and run commands
+      - name: Deploy and restart app
+        uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.LOCAL_HOST }}
-          username: ${{ secrets.LOCAL_USER }}
-          key: ${{ secrets.LOCAL_SSH_KEY }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
           script: |
-            $date = Get-Date -Format "yyyy-MM-dd"
-            $jarPath = (Get-ChildItem -Path "${{ secrets.TARGET_FOLDER }}" -Filter "*.jar" | Select-Object -First 1).FullName
-            Copy-Item $jarPath "${{ secrets.BACKUP_FOLDER }}\app-$date.jar"
-
-      # 6. Start the app
-      - name: Start Spring Boot App
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.LOCAL_HOST }}
-          username: ${{ secrets.LOCAL_USER }}
-          key: ${{ secrets.LOCAL_SSH_KEY }}
-          script: |
-            cd "${{ secrets.TARGET_FOLDER }}"
-            mvn spring-boot:run
+            pkill -f 'java -jar' || true
+            cp ~/app/backup/app-$(date +'%Y-%m-%d').jar ~/app/latest.jar
+            nohup java -jar ~/app/latest.jar > ~/app/log.txt 2>&1 &
+            echo "App deployed successfully."
