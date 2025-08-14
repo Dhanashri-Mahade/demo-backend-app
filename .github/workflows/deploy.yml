@@ -141,20 +141,20 @@ jobs:
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
           to: "dhanashrimahade@gmail.com"
           body: |
-            📢 **MyBOQ App Workflow Notification**
+            📢 MyBOQ App Workflow Notification
 
-            Your workflow has been started for **MyBOQ App**
+            Your workflow has been started for MyBOQ App
 
-            **Trigger Type:** ${{ needs.init.outputs.trigger_type }}
-            **Start Time:** ${{ needs.init.outputs.start_time }}
-            **End Time:** ${{ steps.get_end_time.outputs.end_time }}
-            **Status:** ✅ SUCCESS
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Status: ✅ SUCCESS
 
-            **Files updated in backup branch:**
+            Files updated in backup branch:
             1) MyBOQ.jar
-            ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0}\n3) .env.production', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
+            ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0} \n3) .env.production', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
 
-            **Path:** https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
+            Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
 
             ---
             _Powered by GitHub Actions 🚀_
@@ -176,15 +176,15 @@ jobs:
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
           to: "dhanashri.mahade@siliconmount.com"
           body: |
-            ⚠️ **MyBOQ App Workflow Alert**
+            ⚠️ MyBOQ App Workflow Alert
 
-            Your workflow for **MyBOQ App** has **FAILED** ❌
+            Your workflow for MyBOQ App has FAILED ❌
 
-            **Trigger Type:** ${{ needs.init.outputs.trigger_type }}
-            **Start Time:** ${{ needs.init.outputs.start_time }}
-            **Error Step:** ${{ needs.build-backup-deploy.outputs.error_step }}
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            Error Step: ${{ needs.build-backup-deploy.outputs.error_step }}
 
-            📄 **Check Logs:**  
+            📄 Check Logs:  
             https://github.com/Dhanashri-Mahade/demo-backend-app/actions
 
             ---
