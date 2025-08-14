@@ -6,13 +6,41 @@ on:
   pull_request:
     branches: [main]
     types: [closed]
-  workflow_dispatch: # Adds manual trigger 
+  workflow_dispatch: # Adds manual trigger
 
 jobs:
+  # Step 0: Initialize context (Start Time & Trigger Type) for notifications
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.ctx.outputs.start_time }}
+      trigger_type: ${{ steps.ctx.outputs.trigger_type }}
+    steps:
+      - name: 🕒 Set START_TIME and TRIGGER_TYPE
+        id: ctx
+        shell: bash
+        run: |
+          # Set IST timezone for formatting
+          START_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          EVENT="${{ github.event_name }}"
+          # Determine trigger type
+          if [ "$EVENT" = "push" ]; then
+            TRIGGER_TYPE="push"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            TRIGGER_TYPE="manual trigger"
+          elif [ "$EVENT" = "pull_request" ] && [ "${{ github.event.pull_request.merged || false }}" = "true" ]; then
+            TRIGGER_TYPE="merge"
+          else
+            TRIGGER_TYPE="$EVENT"
+          fi
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+
   build-backup-deploy:
+    needs: init
     runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     steps:
@@ -21,6 +49,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      # Mark step for failure reporting
+      - name: 📝 Mark Step - Checkout
+        run: echo "STEP_NAME=📦 Checkout Repository" >> $GITHUB_ENV
 
       # Step 2: Setup JDK for Maven build
       - name: ☕ Set up JDK 19
@@ -28,16 +59,21 @@ jobs:
         with:
           java-version: "19"
           distribution: "temurin"
+      # Mark step for failure reporting
+      - name: 📝 Mark Step - Setup JDK
+        run: echo "STEP_NAME=☕ Set up JDK 19" >> $GITHUB_ENV
 
       # Step 3: Build JAR using Maven
       - name: 🛠 Build JAR using Maven
         run: |
+          echo "STEP_NAME=🛠 Build JAR using Maven" >> $GITHUB_ENV
           mvn clean package -X
           ls -la target/
 
       # Step 4: Verify JAR file exists
       - name: 🔍 Verify JAR file
         run: |
+          echo "STEP_NAME=🔍 Verify JAR file" >> $GITHUB_ENV
           if [ ! -f target/*.jar ]; then
             echo "Error: No JAR file found in target/"
             exit 1
@@ -49,25 +85,29 @@ jobs:
       # Step 5: Prepare backup branch and rename old JAR if exists
       - name: 📂 Prepare backup branch and rename old JAR if exists
         run: |
+          echo "STEP_NAME=📂 Prepare backup branch and rename old JAR if exists" >> $GITHUB_ENV
           git fetch origin
           git checkout backup || git checkout -b backup
 
           if [ -f "MyBOQ.jar" ] && [ -f ".env.production" ]; then
             OLD_DATE=$(grep '^date=' .env.production | cut -d'=' -f2)
             if [ ! -z "$OLD_DATE" ]; then
-              echo "Renaming old MyBOQ.jar to ${OLD_DATE}.jar"
-              mv MyBOQ.jar "${OLD_DATE}.jar"
-              git add "${OLD_DATE}.jar"
+              OLD_FILENAME="MyBOQ_${OLD_DATE}.jar"
+              echo "Renaming old MyBOQ.jar to ${OLD_FILENAME}"
+              mv MyBOQ.jar "${OLD_FILENAME}"
+              git add "${OLD_FILENAME}"
+              # Persist OLD_FILENAME for later (email)
+              echo "OLD_FILENAME=${OLD_FILENAME}" >> $GITHUB_ENV
             fi
           fi
 
       # Step 6: Generate new .env.production with date, version, timestamp
       - name: 🏷 Create new .env.production
         run: |
+          echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
           TODAY=$(date +"%Y-%m-%d")
           COMMIT_HASH=$(git rev-parse --short HEAD)
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-          
           echo "date=$TODAY" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
           echo "timestamp=$TIMESTAMP" >> .env.production
@@ -75,13 +115,154 @@ jobs:
       # Step 7: Copy and rename new JAR to MyBOQ.jar
       - name: 📦 Add new MyBOQ.jar
         run: |
+          echo "STEP_NAME=📦 Add new MyBOQ.jar" >> $GITHUB_ENV
           cp "${{ env.JAR_FILE }}" MyBOQ.jar
           git add MyBOQ.jar .env.production
 
       # Step 8: Commit and push to backup branch
       - name: 🔁 Commit and push changes to backup branch
         run: |
+          echo "STEP_NAME=🔁 Commit and push changes to backup branch" >> $GITHUB_ENV
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git commit -m "🔁 Backup updated - $(date +"%Y-%m-%d %H:%M:%S")" || echo "Nothing to commit"
           git push origin backup --force
+
+      # Step 9: Collect notification context (always upload)
+      - name: 🧾 Collect notification context
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notify_context
+          path: |
+            context.env
+        # Prepare context.env file
+      - name: 🧾 Prepare context.env
+        if: always()
+        run: |
+          echo "STEP_NAME=🧾 Prepare context.env" >> $GITHUB_ENV
+          {
+            echo "OLD_FILENAME=${OLD_FILENAME:-}"
+          } > context.env
+
+      # Step 10: Save failing step name (if any) and upload
+      - name: 🚨 Capture failure context
+        if: failure()
+        run: |
+          {
+            echo "ERROR_STEP=${STEP_NAME:-Unknown}"
+          } > failure.env
+      - name: 🚨 Upload failure context
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notify_failure_ctx
+          path: failure.env
+
+  notify-success:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      # Step A: Download notification context
+      - name: 📥 Download notify_context
+        uses: actions/download-artifact@v4
+        with:
+          name: notify_context
+
+      # Step B: Compose success email body
+      - name: 🧩 Compose success email
+        id: compose_success
+        shell: bash
+        run: |
+          # Load OLD_FILENAME if present
+          [ -f context.env ] && source context.env || true
+          TRIGGER_TYPE='${{ needs.init.outputs.trigger_type }}'
+          START_TIME='${{ needs.init.outputs.start_time }}'
+          END_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          LINE2=""
+          LINE3=""
+          if [ -n "${OLD_FILENAME:-}" ]; then
+            LINE2=" 2) ${OLD_FILENAME}"
+            LINE3=" 3) .env.production"
+          else
+            LINE2=" 2) .env.production"
+          fi
+
+          BODY="Your workflow has been started for MyBOQ App
+          Trigger Type: ${TRIGGER_TYPE}
+          Start Time: ${START_TIME}
+          End Time: ${END_TIME}
+          Status: SUCCESS ✅
+          Files updated in backup branch:
+          1) MyBOQ.jar
+          ${LINE2}
+          ${LINE3}
+          Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/"
+
+          {
+            echo "body<<'EOF'"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      # Step C: Send success email (Titan SMTP)
+      - name: 📧 Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - SUCCESS ✅"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: ${{ steps.compose_success.outputs.body }}
+
+  notify-failure:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      # Step A: Download failure context
+      - name: 📥 Download failure context (if any)
+        uses: actions/download-artifact@v4
+        with:
+          name: notify_failure_ctx
+        continue-on-error: true
+
+      # Step B: Compose failure email body
+      - name: 🧩 Compose failure email
+        id: compose_failure
+        shell: bash
+        run: |
+          TRIGGER_TYPE='${{ needs.init.outputs.trigger_type }}'
+          START_TIME='${{ needs.init.outputs.start_time }}'
+          ERROR_STEP="Unknown"
+          [ -f failure.env ] && source failure.env || true
+          BODY="Your workflow has been started for MyBOQ App
+          Trigger Type: ${TRIGGER_TYPE}
+          Start Time: ${START_TIME}
+          Status: FAILED ❌
+          Error happened at: Step - ${ERROR_STEP}
+          Check logs: https://github.com/Dhanashri-Mahade/demo-backend-app/actions"
+          {
+            echo "body<<'EOF'"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      # Step C: Send failure email (Titan SMTP)
+      - name: 📧 Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - FAILED ❌"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: ${{ steps.compose_failure.outputs.body }}
