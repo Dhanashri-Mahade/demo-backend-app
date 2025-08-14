@@ -42,6 +42,9 @@ jobs:
     permissions:
       contents: write
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    outputs:
+      old_filename: ${{ steps.export_ctx.outputs.old_filename }}
+      error_step: ${{ steps.capture_failure.outputs.error_step }}
 
     steps:
       # Step 1: Checkout main branch code
@@ -128,65 +131,44 @@ jobs:
           git commit -m "🔁 Backup updated - $(date +"%Y-%m-%d %H:%M:%S")" || echo "Nothing to commit"
           git push origin backup --force
 
-      # Step 9: Collect notification context (always upload)
-      - name: 🧾 Collect notification context
+      # Step 9: Export OLD_FILENAME for notifications (always)
+      - name: 🧾 Export notification context
+        id: export_ctx
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: notify_context
-          path: |
-            context.env
-        # Prepare context.env file
-      - name: 🧾 Prepare context.env
-        if: always()
+        shell: bash
         run: |
-          echo "STEP_NAME=🧾 Prepare context.env" >> $GITHUB_ENV
-          {
-            echo "OLD_FILENAME=${OLD_FILENAME:-}"
-          } > context.env
+          echo "STEP_NAME=🧾 Export notification context" >> $GITHUB_ENV
+          echo "old_filename=${OLD_FILENAME:-}" >> $GITHUB_OUTPUT
 
-      # Step 10: Save failing step name (if any) and upload
-      - name: 🚨 Capture failure context
+      # Step 10: Capture failure step name (if any)
+      - name: 🚨 Capture failure step name
+        id: capture_failure
         if: failure()
+        shell: bash
         run: |
-          {
-            echo "ERROR_STEP=${STEP_NAME:-Unknown}"
-          } > failure.env
-      - name: 🚨 Upload failure context
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: notify_failure_ctx
-          path: failure.env
+          echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
 
   notify-success:
     needs: [init, build-backup-deploy]
     runs-on: ubuntu-latest
     if: success()
     steps:
-      # Step A: Download notification context
-      - name: 📥 Download notify_context
-        uses: actions/download-artifact@v4
-        with:
-          name: notify_context
-
-      # Step B: Compose success email body
+      # Step A: Compose success email body
       - name: 🧩 Compose success email
         id: compose_success
         shell: bash
         run: |
-          # Load OLD_FILENAME if present
-          [ -f context.env ] && source context.env || true
           TRIGGER_TYPE='${{ needs.init.outputs.trigger_type }}'
           START_TIME='${{ needs.init.outputs.start_time }}'
           END_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
-          LINE2=""
-          LINE3=""
-          if [ -n "${OLD_FILENAME:-}" ]; then
+          OLD_FILENAME='${{ needs.build-backup-deploy.outputs.old_filename }}'
+
+          if [ -n "$OLD_FILENAME" ] && [ "$OLD_FILENAME" != "null" ]; then
             LINE2=" 2) ${OLD_FILENAME}"
             LINE3=" 3) .env.production"
           else
             LINE2=" 2) .env.production"
+            LINE3=""
           fi
 
           BODY="Your workflow has been started for MyBOQ App
@@ -206,7 +188,7 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      # Step C: Send success email (Titan SMTP)
+      # Step B: Send success email (Titan SMTP)
       - name: 📧 Send success email
         uses: dawidd6/action-send-mail@v3
         with:
@@ -225,22 +207,15 @@ jobs:
     runs-on: ubuntu-latest
     if: failure()
     steps:
-      # Step A: Download failure context
-      - name: 📥 Download failure context (if any)
-        uses: actions/download-artifact@v4
-        with:
-          name: notify_failure_ctx
-        continue-on-error: true
-
-      # Step B: Compose failure email body
+      # Step A: Compose failure email body
       - name: 🧩 Compose failure email
         id: compose_failure
         shell: bash
         run: |
           TRIGGER_TYPE='${{ needs.init.outputs.trigger_type }}'
           START_TIME='${{ needs.init.outputs.start_time }}'
-          ERROR_STEP="Unknown"
-          [ -f failure.env ] && source failure.env || true
+          ERROR_STEP='${{ needs.build-backup-deploy.outputs.error_step }}'
+          [ -z "$ERROR_STEP" ] && ERROR_STEP="Unknown"
           BODY="Your workflow has been started for MyBOQ App
           Trigger Type: ${TRIGGER_TYPE}
           Start Time: ${START_TIME}
@@ -253,7 +228,7 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      # Step C: Send failure email (Titan SMTP)
+      # Step B: Send failure email (Titan SMTP)
       - name: 📧 Send failure email
         uses: dawidd6/action-send-mail@v3
         with:
