@@ -65,8 +65,11 @@ jobs:
       - name: 🔍 Verify JAR file
         run: |
           echo "STEP_NAME=🔍 Verify JAR file" >> $GITHUB_ENV
-          echo "Forcing failure for testing..."
-          exit 1
+          if [ ! -f target/*.jar ]; then
+            echo "Error: No JAR file found"
+            exit 1
+          fi
+          echo "JAR_FILE=$(ls target/*.jar)" >> $GITHUB_ENV
 
       - name: 📂 Prepare backup branch and rename old JAR
         run: |
