@@ -139,7 +139,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "MyBOQ App Workflow - SUCCESS ✅"
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-          to: "dhanashrimahade@gmail.com"
+          to: "dhanashri.mahade@siliconmount.com"
           body: |
             📢 MyBOQ App Workflow Notification
 
@@ -152,7 +152,7 @@ jobs:
 
             Files updated in backup branch:
             1) MyBOQ.jar
-            ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0} \n3) .env.production', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
+            ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0}', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
 
             Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
 
