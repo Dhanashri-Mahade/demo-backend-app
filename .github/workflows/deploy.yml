@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
     types: [closed]
-  workflow_dispatch:
+  workflow_dispatch: # Adds manual trigger
 
 jobs:
   init:
@@ -43,12 +43,14 @@ jobs:
       old_filename: ${{ steps.export_ctx.outputs.old_filename }}
       error_step: ${{ steps.capture_failure.outputs.error_step }}
     steps:
+      # Step 1: Checkout main branch code
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - run: echo "STEP_NAME=📦 Checkout Repository" >> $GITHUB_ENV
 
+        # Step 2: Setup JDK for Maven build
       - name: ☕ Set up JDK 19
         uses: actions/setup-java@v3
         with:
@@ -56,12 +58,14 @@ jobs:
           distribution: "temurin"
       - run: echo "STEP_NAME=☕ Set up JDK 19" >> $GITHUB_ENV
 
+      # Step 3: Build JAR using Maven
       - name: 🛠 Build JAR using Maven
         run: |
           echo "STEP_NAME=🛠 Build JAR using Maven" >> $GITHUB_ENV
           mvn clean package -X
           ls -la target/
 
+      # Step 4: Verify JAR file exists
       - name: 🔍 Verify JAR file
         run: |
           echo "STEP_NAME=🔍 Verify JAR file" >> $GITHUB_ENV
@@ -71,6 +75,7 @@ jobs:
           fi
           echo "JAR_FILE=$(ls target/*.jar)" >> $GITHUB_ENV
 
+      # Step 5: Prepare backup branch and rename old JAR if exists
       - name: 📂 Prepare backup branch and rename old JAR
         run: |
           echo "STEP_NAME=📂 Prepare backup branch" >> $GITHUB_ENV
@@ -86,6 +91,7 @@ jobs:
             fi
           fi
 
+      # Step 6: Generate new .env.production with date, version, timestamp
       - name: 🏷 Create new .env.production
         run: |
           echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
@@ -96,12 +102,14 @@ jobs:
           echo "version=$COMMIT_HASH" >> .env.production
           echo "timestamp=$TIMESTAMP" >> .env.production
 
+      # Step 7: Copy and rename new JAR to MyBOQ.jar
       - name: 📦 Add new MyBOQ.jar
         run: |
           echo "STEP_NAME=📦 Add new MyBOQ.jar" >> $GITHUB_ENV
           cp "${{ env.JAR_FILE }}" MyBOQ.jar
           git add MyBOQ.jar .env.production
 
+      # Step 8: Commit and push to backup branch
       - name: 🔁 Commit and push
         run: |
           echo "STEP_NAME=🔁 Commit and push" >> $GITHUB_ENV
@@ -120,6 +128,7 @@ jobs:
         if: failure()
         run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
 
+  # send success notification on mail
   notify-success:
     needs: [init, build-backup-deploy]
     runs-on: ubuntu-latest
@@ -139,7 +148,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "MyBOQ App Workflow - SUCCESS ✅"
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-          to: "vijaykumar.mehtre@siliconmount.com"
+          to: "dhanashri.mahade@siliconmount.com , dhanashrimahade@gmail.com"
           body: |
             📢 MyBOQ App Workflow Notification
 
@@ -159,6 +168,7 @@ jobs:
             ---
             _Powered by GitHub Actions 🚀_
 
+  # Send failure notification on mail
   notify-failure:
     needs: [init, build-backup-deploy]
     runs-on: ubuntu-latest
@@ -189,4 +199,3 @@ jobs:
 
             ---
             _Powered by GitHub Actions 🚀 – Ensuring transparency in every build_
-
