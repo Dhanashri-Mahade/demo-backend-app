@@ -17,6 +17,9 @@ on:
         description: "Enter new version number (e.g. 1.01.02)"
         required: true
 
+permissions:
+    contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
