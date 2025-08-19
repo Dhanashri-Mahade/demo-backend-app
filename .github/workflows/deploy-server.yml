@@ -74,10 +74,14 @@ jobs:
           git commit -m "Update version to ${{ github.event.inputs.version }}"
           git push origin backup
 
-      - name: Upload JAR to Windows Server
+      - name: Test SSH Connection
         run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
-          echo "Uploading MyBOQ.jar to server..."
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}
-          
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH working on Windows Server'"
+
+
+      # - name: Upload JAR to Windows Server
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y sshpass
+      #     echo "Uploading MyBOQ.jar to server..."
+      #     sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}
