@@ -1,0 +1,66 @@
+name: Deploy to Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      jar_file:
+        description: "Enter the .jar filename from backup branch"
+        required: true
+        default: "app.jar"
+      version:
+        description: "Enter new version number (e.g. 1.01.02)"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backup branch
+        uses: actions/checkout@v3
+        with:
+          ref: backup
+
+      - name: List available JAR files
+        run: |
+          echo "================================================="
+          echo "Available JAR files in backup branch:"
+          ls -1 *.jar || echo "No JAR files found!"
+          echo "================================================="
+
+      - name: Show previous version
+        run: |
+          if [ -f deploy.env ]; then
+            echo "Previous version:"
+            cat deploy.env
+          else
+            echo "No previous version found."
+          fi
+
+      - name: Show user inputs
+        run: |
+          echo "================================================="
+          echo "User selected JAR file: ${{ github.event.inputs.jar_file }}"
+          echo "User entered version: ${{ github.event.inputs.version }}"
+          echo "================================================="
+
+      - name: Select and rename JAR
+        run: |
+          echo "Selected JAR: ${{ github.event.inputs.jar_file }}"
+          cp "${{ github.event.inputs.jar_file }}" MyBOQ.jar
+
+      - name: Update deploy.env with new version
+        run: |
+          NEW_VERSION=${{ github.event.inputs.version }}
+          DATE=$(date +'%d-%m-%Y')
+          echo "VERSION=$NEW_VERSION" > deploy.env
+          echo "DATE=$DATE" >> deploy.env
+          echo "Updated deploy.env:"
+          cat deploy.env
+
+      - name: Commit updated deploy.env
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add deploy.env
+          git commit -m "Update version to ${{ github.event.inputs.version }}"
+          git push origin backup

@@ -148,7 +148,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "MyBOQ App Workflow - SUCCESS ✅"
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-          to: "vijaykumar.mehtre@siliconmount.com , yogesh.shinde@siliconmount.com"
+          to: "dhanashri.mahade@siliconmount.com"
           body: |
             📢 MyBOQ App Workflow Notification
 
@@ -184,7 +184,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "MyBOQ App Workflow - FAILED ❌"
           from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-          to: "vijaykumar.mehtre@siliconmount.com , yogesh.shinde@siliconmount.com"
+          to: "dhanashri.mahade@siliconmount.com"
           body: |
             ⚠️ MyBOQ App Workflow Alert
 
