@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: 🚀🔄 Deploy to Server
 
 on:
   workflow_dispatch:
@@ -73,3 +73,11 @@ jobs:
           git add deploy.env
           git commit -m "Update version to ${{ github.event.inputs.version }}"
           git push origin backup
+
+      - name: Upload JAR to Windows Server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          echo "Uploading MyBOQ.jar to server..."
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}
+          
