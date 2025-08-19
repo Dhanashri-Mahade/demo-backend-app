@@ -6,7 +6,13 @@ on:
       jar_file:
         description: "Enter the .jar filename from backup branch"
         required: true
-        default: "app.jar"
+        type: choice
+        options:
+          - MyBOQ.jar
+          - MyBOQ_2025-08-14.jar
+          - MyBOQ_2025-08-15.jar
+          - MyBOQ_2025-08-18.jar
+          - MyBOQ_2025-08-19.jar
       version:
         description: "Enter new version number (e.g. 1.01.02)"
         required: true
