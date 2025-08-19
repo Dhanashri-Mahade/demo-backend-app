@@ -88,6 +88,10 @@ jobs:
         run: |
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "dir C:\\Users\\root\\Jar"
 
+      - name: Stop old app if running
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "taskkill /F /IM java.exe || echo 'No Java process found'"
+
       - name: Upload JAR to Windows Server
         run: |
           sudo apt-get update
@@ -95,13 +99,7 @@ jobs:
           echo "Uploading MyBOQ.jar to server..."
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:"C:\\Users\\root\\Jar\\"
 
-      # ✅ Stop old process and run new JAR
-      - name: Restart Spring Boot App on Server
+      - name: Start Spring Boot App
         run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} powershell -Command "
-            Write-Output 'Stopping any existing Spring Boot process...';
-            Stop-Process -Name 'java' -Force -ErrorAction SilentlyContinue;
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd C:\\Users\\root\\Jar && mvn spring-boot:run > C:\\Users\\root\\Logs\\app.log 2>&1 &"
 
-            Write-Output 'Starting new Spring Boot JAR...';
-            Start-Process -NoNewWindow -FilePath 'java' -ArgumentList '-jar C:\\Users\\root\\Jar\\MyBOQ.jar'
-          "
