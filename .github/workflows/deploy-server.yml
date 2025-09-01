@@ -96,10 +96,25 @@ jobs:
           echo "Uploading MyBOQ.jar to Linux server..."
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
 
-      - name: Start MyBOQ App on server (port 9090, logs in myboq.log)
+      - name: Restart MyBOQ App on server (port 9090, logs in myboq.log)
         run: |
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-            cd ${{ secrets.SERVER_PATH }} && \
+            cd ${{ secrets.SERVER_PATH }}
+
+            echo '🔍 Checking if MyBOQ app is already running...'
+            PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+
+            if [ ! -z \"\$PID\" ]; then
+              echo '⚠️ Found running MyBOQ app (PID:' \$PID '), stopping it...'
+              kill -9 \$PID
+              sleep 2
+            else
+              echo '✅ No running MyBOQ app found, starting fresh.'
+            fi
+
+            echo '🚀 Starting new MyBOQ.jar on port 9090...'
             nohup java -jar MyBOQ.jar --server.port=9090 > myboq.log 2>&1 &
-            echo '✅ MyBOQ app started on port 9090 (logs: myboq.log)'
+            sleep 3
+
+            echo '✅ Restarted MyBOQ app successfully (check logs: myboq.log)'
           "
