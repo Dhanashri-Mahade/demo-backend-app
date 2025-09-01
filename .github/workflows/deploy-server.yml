@@ -1,4 +1,4 @@
-name: 🚀🔄 Deploy to Server
+name: 🚀🔄 Deploy to development Server
 
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
           - MyBOQ_2025-08-15.jar
           - MyBOQ_2025-08-18.jar
           - MyBOQ_2025-08-19.jar
+          - MyBOQ_2025-09-01.jar
       version:
         description: "Enter new version number (e.g. 1.01.02)"
         required: true
@@ -80,26 +81,17 @@ jobs:
           git commit -m "Update version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
           git push origin backup
 
-      - name: Test SSH Connection
-        run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH working on Windows Server'"
-
-      - name: Debug check files
-        run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "dir C:\\Users\\root\\Jar"
-
-      - name: Stop old app if running
-        run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "taskkill /F /IM java.exe || echo 'No Java process found'"
-
-      - name: Upload JAR to Windows Server
+      - name: Test SSH Connection (Linux)
         run: |
           sudo apt-get update
           sudo apt-get install -y sshpass
-          echo "Uploading MyBOQ.jar to server..."
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:"C:\\Users\\root\\Jar\\"
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo '✅ SSH working on Linux Server'"
 
-      - name: Start Spring Boot App
+      - name: Create target folder if not exists
         run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd C:\\Users\\root\\Jar && mvn spring-boot:run > C:\\Users\\root\\Logs\\app.log 2>&1 &"
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "mkdir -p ${{ secrets.SERVER_PATH }}"
 
+      - name: Upload JAR to Linux Server
+        run: |
+          echo "Uploading MyBOQ.jar to Linux server..."
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
