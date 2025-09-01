@@ -95,3 +95,11 @@ jobs:
         run: |
           echo "Uploading MyBOQ.jar to Linux server..."
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
+
+      - name: Start MyBOQ App on server (port 9090, logs in myboq.log)
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd ${{ secrets.SERVER_PATH }} && \
+            nohup java -jar MyBOQ.jar --server.port=9090 > myboq.log 2>&1 &
+            echo '✅ MyBOQ app started on port 9090 (logs: myboq.log)'
+          "
