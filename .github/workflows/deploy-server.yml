@@ -1,4 +1,4 @@
-name: 🚀🔄 Deploy to development Server
+name: 🚀🔥 Deploy on Production Server
 
 on:
   workflow_dispatch:
@@ -87,16 +87,32 @@ jobs:
           sudo apt-get install -y sshpass
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo '✅ SSH working on Linux Server'"
 
-      - name: Create target folder if not exists
+      - name: Create target folder and check logs directory
         run: |
-          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "mkdir -p ${{ secrets.SERVER_PATH }}"
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            # Create main directory if not exists
+            mkdir -p ${{ secrets.SERVER_PATH }}
+            
+            # Check if logs directory exists
+            if [ -d '${{ secrets.SERVER_PATH }}/logs' ]; then
+              echo '✅ Logs directory already exists'
+            else
+              echo '📁 Creating logs directory...'
+              mkdir -p ${{ secrets.SERVER_PATH }}/logs
+              echo '✅ Logs directory created successfully'
+            fi
+            
+            # Show directory structure
+            echo '📂 Directory structure:'
+            ls -la ${{ secrets.SERVER_PATH }}/
+          "
 
       - name: Upload JAR to Linux Server
         run: |
           echo "Uploading MyBOQ.jar to Linux server..."
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
 
-      - name: Restart MyBOQ App on server (port 9090, logs in myboq.log)
+      - name: Restart MyBOQ App on server with daily log rotation
         run: |
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd ${{ secrets.SERVER_PATH }}
@@ -107,14 +123,86 @@ jobs:
             if [ ! -z \"\$PID\" ]; then
               echo '⚠️ Found running MyBOQ app (PID:' \$PID '), stopping it...'
               kill -9 \$PID
-              sleep 2
+              sleep 3
+              echo '🛑 Previous app stopped successfully'
             else
               echo '✅ No running MyBOQ app found, starting fresh.'
             fi
 
+            # Generate log filename with current date (DD_MM_YY format)
+            LOG_DATE=\$(date +'%d_%m_%y')
+            LOG_FILE=\"logs/myboq_\${LOG_DATE}.log\"
+            
+            echo \"📝 Today's log file: \$LOG_FILE\"
+            
+            # Add startup entry to log
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🚀 Starting MyBOQ Application\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🏷️  Version: ${{ github.event.inputs.version }}\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🔌 Port: 9090\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            
             echo '🚀 Starting new MyBOQ.jar on port 9090...'
-            nohup java -jar MyBOQ.jar --server.port=9090 > myboq.log 2>&1 &
-            sleep 3
-
-            echo '✅ Restarted MyBOQ app successfully (check logs: myboq.log)'
+            # Start application with daily log file (both stdout and stderr)
+            nohup java -jar MyBOQ.jar --server.port=9090 >> \$LOG_FILE 2>&1 &
+            
+            sleep 5
+            
+            # Verify application started
+            NEW_PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$NEW_PID\" ]; then
+              echo \"✅ MyBOQ app started successfully (PID: \$NEW_PID)\"
+              echo \"📋 Log file: \$LOG_FILE\"
+              echo \"📂 All logs stored in: ${{ secrets.SERVER_PATH }}/logs/\"
+              
+              # Show last few lines of today's log
+              echo '--- Last 5 lines of today'\''s log ---'
+              tail -5 \$LOG_FILE 2>/dev/null || echo 'Log file is being created...'
+            else
+              echo '❌ Failed to start MyBOQ app!'
+              exit 1
+            fi
           "
+
+      - name: Create log cleanup script for 10 days retention
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd ${{ secrets.SERVER_PATH }}
+            
+            # Create a cleanup script to remove logs older than 10 days
+            cat > cleanup_old_logs.sh << 'EOF'
+            #!/bin/bash
+            # Delete log files older than 10 days
+            echo \"🧹 Starting log cleanup - \$(date)\"
+            DELETED_COUNT=\$(find logs/ -name 'myboq_*.log' -mtime +10 -print | wc -l)
+            if [ \$DELETED_COUNT -gt 0 ]; then
+              echo \"🗑️  Deleting \$DELETED_COUNT old log files...\"
+              find logs/ -name 'myboq_*.log' -mtime +10 -delete
+              echo \"✅ Cleaned up \$DELETED_COUNT log files older than 10 days\"
+            else
+              echo \"✅ No old log files to delete\"
+            fi
+            echo \"📊 Current log files:\"
+            ls -la logs/myboq_*.log 2>/dev/null || echo \"No log files found\"
+            echo \"🏁 Cleanup completed - \$(date)\"
+            EOF
+            
+            chmod +x cleanup_old_logs.sh
+            echo '🧹 Created log cleanup script: cleanup_old_logs.sh'
+            echo '💡 Run manually: ./cleanup_old_logs.sh'
+            echo '💡 Or add to crontab for automatic cleanup (daily at 2 AM):'
+            echo '    0 2 * * * cd ${{ secrets.SERVER_PATH }} && ./cleanup_old_logs.sh'
+          "
+
+      - name: Show deployment summary
+        run: |
+          echo "================================================="
+          echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
+          echo "================================================="
+          echo "📦 JAR File: ${{ github.event.inputs.jar_file }}"
+          echo "🏷️  Version: ${{ github.event.inputs.version }}"
+          echo "🔌 Port: 9090"
+          echo "📝 Daily logs will be saved as: logs/myboq_DD_MM_YY.log"
+          echo "🧹 Log retention: 10 days"
+          echo "📂 Server path: ${{ secrets.SERVER_PATH }}"
+          echo "================================================="
