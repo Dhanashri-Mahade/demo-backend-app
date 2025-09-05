@@ -129,73 +129,73 @@ jobs:
         run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
 
   # send success notification on mail
-  # notify-success:
-  #   needs: [init, build-backup-deploy]
-  #   runs-on: ubuntu-latest
-  #   if: success()
-  #   steps:
-  #     - name: Get End Time
-  #       id: get_end_time
-  #       run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+  notify-success:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
 
-  #     - name: 📧 Send success email
-  #       uses: dawidd6/action-send-mail@v3
-  #       with:
-  #         server_address: smtp.titan.email
-  #         server_port: 465
-  #         secure: true
-  #         username: ${{ secrets.SMTP_USERNAME }}
-  #         password: ${{ secrets.SMTP_PASSWORD }}
-  #         subject: "MyBOQ App Workflow - SUCCESS ✅"
-  #         from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-  #         to: "dhanashri.mahade@siliconmount.com"
-  #         body: |
-  #           📢 MyBOQ App Workflow Notification
+      - name: 📧 Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - SUCCESS ✅"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: |
+            📢 MyBOQ App Workflow Notification
 
-  #           Your workflow has been started for MyBOQ App
+            Your workflow has been started for MyBOQ App
 
-  #           Trigger Type: ${{ needs.init.outputs.trigger_type }}
-  #           Start Time: ${{ needs.init.outputs.start_time }}
-  #           End Time: ${{ steps.get_end_time.outputs.end_time }}
-  #           Status: ✅ SUCCESS
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Status: ✅ SUCCESS
 
-  #           Files updated in backup branch:
-  #           1) MyBOQ.jar
-  #           ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0}', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
+            Files updated in backup branch:
+            1) MyBOQ.jar
+            ${{ needs.build-backup-deploy.outputs.old_filename && format('2) {0}', needs.build-backup-deploy.outputs.old_filename) || '2) .env.production' }}
 
-  #           Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
+            Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
 
-  #           ---
-  #           _Powered by GitHub Actions 🚀_
+            ---
+            _Powered by GitHub Actions 🚀_
 
-  # # Send failure notification on mail
-  # notify-failure:
-  #   needs: [init, build-backup-deploy]
-  #   runs-on: ubuntu-latest
-  #   if: failure()
-  #   steps:
-  #     - name: 📧 Send failure email
-  #       uses: dawidd6/action-send-mail@v3
-  #       with:
-  #         server_address: smtp.titan.email
-  #         server_port: 465
-  #         secure: true
-  #         username: ${{ secrets.SMTP_USERNAME }}
-  #         password: ${{ secrets.SMTP_PASSWORD }}
-  #         subject: "MyBOQ App Workflow - FAILED ❌"
-  #         from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
-  #         to: "dhanashri.mahade@siliconmount.com"
-  #         body: |
-  #           ⚠️ MyBOQ App Workflow Alert
+  # Send failure notification on mail
+  notify-failure:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: 📧 Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - FAILED ❌"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: |
+            ⚠️ MyBOQ App Workflow Alert
 
-  #           Your workflow for MyBOQ App has FAILED ❌
+            Your workflow for MyBOQ App has FAILED ❌
 
-  #           Trigger Type: ${{ needs.init.outputs.trigger_type }}
-  #           Start Time: ${{ needs.init.outputs.start_time }}
-  #           Error Step: ${{ needs.build-backup-deploy.outputs.error_step }}
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            Error Step: ${{ needs.build-backup-deploy.outputs.error_step }}
 
-  #           📄 Check Logs:  
-  #           https://github.com/Dhanashri-Mahade/demo-backend-app/actions
+            📄 Check Logs:  
+            https://github.com/Dhanashri-Mahade/demo-backend-app/actions
 
-  #           ---
-  #           _Powered by GitHub Actions 🚀 – Ensuring transparency in every build_
+            ---
+            _Powered by GitHub Actions 🚀 – Ensuring transparency in every build_
