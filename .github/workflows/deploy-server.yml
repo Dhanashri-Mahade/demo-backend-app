@@ -4,17 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       jar_file:
-        description: "Enter the .jar filename from backup branch"
+        description: "Enter the .jar filename from backup branch (e.g. MyBOQ_2025-09-05.jar)"
         required: true
-        type: choice
-        options:
-          - MyBOQ.jar
-          - MyBOQ_2025-08-14.jar
-          - MyBOQ_2025-08-15.jar
-          - MyBOQ_2025-08-18.jar
-          - MyBOQ_2025-08-19.jar
-          - MyBOQ_2025-09-01.jar
-          - MyBOQ_2025-09-05.jar
+        type: string
       version:
         description: "Enter new version number (e.g. 1.01.02)"
         required: true
