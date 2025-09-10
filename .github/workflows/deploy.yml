@@ -147,7 +147,9 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git add .github/workflows/deploy-server.yml
           git commit -m "Auto-update deploy-server.yml with $OLD_FILENAME and previous version info [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/Dhanashri-Mahade/demo-backend-app.git main
+          # Force Git to use PAT instead of GITHUB_TOKEN
+          git remote set-url origin https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/Dhanashri-Mahade/demo-backend-app.git
+          git push origin main
 
 
 
