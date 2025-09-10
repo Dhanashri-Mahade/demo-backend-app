@@ -80,16 +80,6 @@ jobs:
         run: |
           echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
           NEW_VERSION=${{ github.event.inputs.version }}
-          DATE=$(date +'%d-%m-%Y')
-          echo "VERSION=$NEW_VERSION" > deploy.env
-          echo "DATE=$DATE" >> deploy.env
-          echo "Updated deploy.env:"
-          cat deploy.env
-
-      - name: Update deploy.env with new version
-        run: |
-          echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
-          NEW_VERSION=${{ github.event.inputs.version }}
           NEW_JAR=${{ github.event.inputs.jar_file }}
           DATE=$(date +'%d-%m-%Y')
           echo "LAST_DATE=$DATE" > deploy.env
