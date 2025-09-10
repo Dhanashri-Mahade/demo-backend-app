@@ -4,11 +4,15 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'deploy-server.yml'
+      - '.github/workflows/deploy-server.yml'
   pull_request:
     branches: [main]
     types: [closed]
   workflow_dispatch: # Adds manual trigger
+
+permissions:
+  contents: write
+  workflows: write
 
 jobs:
   init:
