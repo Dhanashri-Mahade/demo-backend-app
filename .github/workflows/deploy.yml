@@ -12,8 +12,9 @@ on:
 
 permissions:
   contents: write
-  packages: write
-  pull-requests: write
+  # packages: write
+  # pull-requests: write
+  workflows: write
 
 jobs:
   init:
