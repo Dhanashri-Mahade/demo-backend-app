@@ -82,18 +82,39 @@ jobs:
           NEW_VERSION=${{ github.event.inputs.version }}
           NEW_JAR=${{ github.event.inputs.jar_file }}
           DATE=$(date +'%d-%m-%Y')
+          touch deploy.env
+          # Read existing history
+          HISTORY=$(sed -n '/^HISTORY=/,$p' deploy.env | tail -n +2 || true)
+          # Read existing LAST_ values for history
+          LAST_DATE=$(grep "^LAST_DATE=" deploy.env | cut -d= -f2 || echo "")
+          LAST_VERSION=$(grep "^LAST_VERSION=" deploy.env | cut -d= -f2 || echo "")
+          LAST_JAR=$(grep "^LAST_JAR=" deploy.env | cut -d= -f2 || echo "")
+          # Write new deploy.env
           echo "LAST_DATE=$DATE" > deploy.env
           echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
           echo "LAST_JAR=$NEW_JAR" >> deploy.env
           echo "HISTORY=" >> deploy.env
-          if [ -f deploy.env ]; then
-            # Read existing HISTORY entries if file exists
-            grep '^HISTORY=' deploy.env -A 1000 | tail -n +2 >> deploy.env || true
+          # Append previous LAST_ entry to history if exists
+          if [ -n "$LAST_DATE" ] && [ -n "$LAST_VERSION" ] && [ -n "$LAST_JAR" ]; then
+            echo "$LAST_DATE,$LAST_VERSION,$LAST_JAR" >> deploy.env
           fi
-          # Append new HISTORY entry
+          # Append existing history
+          if [ -n "$HISTORY" ]; then
+            echo "$HISTORY" >> deploy.env
+          fi
+          # Append new history entry
           echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
           echo "Updated deploy.env:"
           cat deploy.env
+
+      - name: Commit and push deploy.env
+        run: |
+          echo "STEP_NAME=📤 Commit and push deploy.env" >> $GITHUB_ENV
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add deploy.env
+          git commit -m "Update deploy.env with new deployment details: ${{ github.event.inputs.version }}"
+          git push origin backup
 
       - name: Test SSH Connection (Linux)
         run: |
