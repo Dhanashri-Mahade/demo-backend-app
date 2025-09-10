@@ -3,6 +3,8 @@ name: 🚀 Upload the Jar file on Github Branch
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'deploy-server.yml'
   pull_request:
     branches: [main]
     types: [closed]
@@ -90,6 +92,57 @@ jobs:
               echo "OLD_FILENAME=${OLD_FILENAME}" >> $GITHUB_ENV
             fi
           fi
+
+      #update deploy-server file code with new .jarnames
+      - name: 🛠️ Update deploy-server.yml with new JAR + version info
+        run: |
+          # Get the old JAR name
+          OLD_FILENAME="${OLD_FILENAME}"
+
+          # Checkout main branch to edit deploy-server.yml
+          git fetch origin main
+          git checkout main
+
+          # Ensure deploy-server.yml exists
+          if [ ! -f deploy-server.yml ]; then
+            echo "❌ deploy-server.yml not found in main branch!"
+            exit 1
+          fi
+
+          echo "📦 Checking if $OLD_FILENAME exists in deploy-server.yml options list..."
+          if grep -q "$OLD_FILENAME" deploy-server.yml; then
+            echo "✅ Already present, no update needed."
+          else
+            echo "➕ Adding $OLD_FILENAME to deploy-server.yml options..."
+            awk -v new_option="          - $OLD_FILENAME" '
+              /^ {10}- / { print; next }
+              /options:/ {
+                print;
+                added=1;
+                print new_option;
+                next
+              }
+              {print}
+            ' deploy-server.yml > deploy-server.tmp.yml
+            mv deploy-server.tmp.yml deploy-server.yml
+          fi
+
+          # Read previous version and date from backup branch
+          git fetch origin backup
+          git checkout backup -- deploy.env
+          PREV_VERSION=$(grep "VERSION=" deploy.env | cut -d= -f2)
+          PREV_DATE=$(grep "DATE=" deploy.env | cut -d= -f2)
+
+          # Update version input description
+          sed -i "/description: \"Enter new version number/ a\        description: \"Previous version: $PREV_VERSION deployed on $PREV_DATE\"" deploy-server.yml
+
+          # Commit and push changes
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add deploy-server.yml
+          git commit -m "Auto-update deploy-server.yml with $OLD_FILENAME and previous version info [skip ci]" || echo "No changes to commit"
+          git push origin main
+
 
       # Step 6: Generate new .env.production with date, version, timestamp
       - name: 🏷 Create new .env.production
