@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   init:
@@ -150,8 +151,6 @@ jobs:
           # Force Git to use PAT instead of GITHUB_TOKEN
           git remote set-url origin https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/Dhanashri-Mahade/demo-backend-app.git
           git push origin main
-
-
 
       # Step 6: Generate new .env.production with date, version, timestamp
       - name: 🏷 Create new .env.production
