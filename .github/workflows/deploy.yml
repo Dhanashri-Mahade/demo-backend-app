@@ -142,12 +142,13 @@ jobs:
           # Update version input description in deploy-server.yml
           sed -i "/description: \"Enter new version number/ a\        description: \"Previous version: $PREV_VERSION deployed on $PREV_DATE\"" .github/workflows/deploy-server.yml
 
-          # Commit and push changes (skip CI to avoid loop)
+          # Commit and push changes using PAT
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add .github/workflows/deploy-server.yml
           git commit -m "Auto-update deploy-server.yml with $OLD_FILENAME and previous version info [skip ci]" || echo "No changes to commit"
-          git push origin main
+          git push https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/Dhanashri-Mahade/demo-backend-app.git main
+
 
 
       # Step 6: Generate new .env.production with date, version, timestamp
