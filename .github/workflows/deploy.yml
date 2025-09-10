@@ -96,21 +96,23 @@ jobs:
       #update deploy-server file code with new .jarnames
       - name: 🛠️ Update deploy-server.yml with new JAR + version info
         run: |
-          # Get the old JAR name
           OLD_FILENAME="${OLD_FILENAME}"
 
-          # Checkout main branch to edit deploy-server.yml
+          # Fetch both branches
           git fetch origin main
+          git fetch origin backup
+
+          # Checkout main branch for editing workflows
           git checkout main
 
-          # Ensure deploy-server.yml exists
-          if [ ! -f deploy-server.yml ]; then
-            echo "❌ deploy-server.yml not found in main branch!"
+          # Ensure deploy-server.yml exists at correct path
+          if [ ! -f .github/workflows/deploy-server.yml ]; then
+            echo "❌ .github/workflows/deploy-server.yml not found in main branch!"
             exit 1
           fi
 
           echo "📦 Checking if $OLD_FILENAME exists in deploy-server.yml options list..."
-          if grep -q "$OLD_FILENAME" deploy-server.yml; then
+          if grep -q "$OLD_FILENAME" .github/workflows/deploy-server.yml; then
             echo "✅ Already present, no update needed."
           else
             echo "➕ Adding $OLD_FILENAME to deploy-server.yml options..."
@@ -123,23 +125,24 @@ jobs:
                 next
               }
               {print}
-            ' deploy-server.yml > deploy-server.tmp.yml
-            mv deploy-server.tmp.yml deploy-server.yml
+            ' .github/workflows/deploy-server.yml > deploy-server.tmp.yml
+            mv deploy-server.tmp.yml .github/workflows/deploy-server.yml
           fi
 
-          # Read previous version and date from backup branch
-          git fetch origin backup
-          git checkout backup -- deploy.env
+          # Grab deploy.env from backup branch
+          git checkout origin/backup -- deploy.env
           PREV_VERSION=$(grep "VERSION=" deploy.env | cut -d= -f2)
           PREV_DATE=$(grep "DATE=" deploy.env | cut -d= -f2)
 
-          # Update version input description
-          sed -i "/description: \"Enter new version number/ a\        description: \"Previous version: $PREV_VERSION deployed on $PREV_DATE\"" deploy-server.yml
+          echo "📋 Previous version found: $PREV_VERSION deployed on $PREV_DATE"
 
-          # Commit and push changes
+          # Update version input description in deploy-server.yml
+          sed -i "/description: \"Enter new version number/ a\        description: \"Previous version: $PREV_VERSION deployed on $PREV_DATE\"" .github/workflows/deploy-server.yml
+
+          # Commit and push changes (skip CI to avoid loop)
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git add deploy-server.yml
+          git add .github/workflows/deploy-server.yml
           git commit -m "Auto-update deploy-server.yml with $OLD_FILENAME and previous version info [skip ci]" || echo "No changes to commit"
           git push origin main
 
