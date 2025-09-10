@@ -82,28 +82,24 @@ jobs:
           NEW_VERSION=${{ github.event.inputs.version }}
           NEW_JAR=${{ github.event.inputs.jar_file }}
           DATE=$(date +'%d-%m-%Y')
-          touch deploy.env
-          # Read existing history
-          HISTORY=$(sed -n '/^HISTORY=/,$p' deploy.env | tail -n +2 || true)
-          # Read existing LAST_ values for history
-          LAST_DATE=$(grep "^LAST_DATE=" deploy.env | cut -d= -f2 || echo "")
-          LAST_VERSION=$(grep "^LAST_VERSION=" deploy.env | cut -d= -f2 || echo "")
-          LAST_JAR=$(grep "^LAST_JAR=" deploy.env | cut -d= -f2 || echo "")
-          # Write new deploy.env
-          echo "LAST_DATE=$DATE" > deploy.env
-          echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
-          echo "LAST_JAR=$NEW_JAR" >> deploy.env
-          echo "HISTORY=" >> deploy.env
-          # Append previous LAST_ entry to history if exists
-          if [ -n "$LAST_DATE" ] && [ -n "$LAST_VERSION" ] && [ -n "$LAST_JAR" ]; then
-            echo "$LAST_DATE,$LAST_VERSION,$LAST_JAR" >> deploy.env
+
+          if [ ! -f deploy.env ]; then
+            # File does not exist → create new
+            echo "LAST_DATE=$DATE" > deploy.env
+            echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
+            echo "LAST_JAR=$NEW_JAR" >> deploy.env
+            echo "HISTORY=" >> deploy.env
+            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+          else
+            # File exists → update LAST_* and append new history
+            sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
+            sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$NEW_VERSION/" deploy.env || echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
+            sed -i "s/^LAST_JAR=.*/LAST_JAR=$NEW_JAR/" deploy.env || echo "LAST_JAR=$NEW_JAR" >> deploy.env
+            
+            # Append new history line at the end
+            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
           fi
-          # Append existing history
-          if [ -n "$HISTORY" ]; then
-            echo "$HISTORY" >> deploy.env
-          fi
-          # Append new history entry
-          echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+
           echo "Updated deploy.env:"
           cat deploy.env
 
