@@ -86,14 +86,24 @@ jobs:
           echo "Updated deploy.env:"
           cat deploy.env
 
-      - name: Commit updated deploy.env
+      - name: Update deploy.env with new version
         run: |
-          echo "STEP_NAME=💾 Commit updated deploy.env" >> $GITHUB_ENV
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add deploy.env
-          git commit -m "Update version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
-          git push origin backup
+          echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
+          NEW_VERSION=${{ github.event.inputs.version }}
+          NEW_JAR=${{ github.event.inputs.jar_file }}
+          DATE=$(date +'%d-%m-%Y')
+          echo "LAST_DATE=$DATE" > deploy.env
+          echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
+          echo "LAST_JAR=$NEW_JAR" >> deploy.env
+          echo "HISTORY=" >> deploy.env
+          if [ -f deploy.env ]; then
+            # Read existing HISTORY entries if file exists
+            grep '^HISTORY=' deploy.env -A 1000 | tail -n +2 >> deploy.env || true
+          fi
+          # Append new HISTORY entry
+          echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+          echo "Updated deploy.env:"
+          cat deploy.env
 
       - name: Test SSH Connection (Linux)
         run: |
