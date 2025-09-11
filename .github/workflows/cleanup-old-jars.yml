@@ -1,0 +1,52 @@
+name: Cleanup Old JAR Files
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # Runs every month on the 1st at midnight UTC
+  workflow_dispatch:  # manual triggering from the GitHub UI
+
+permissions:
+    contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backup branch
+        uses: actions/checkout@v4
+        with:
+          ref: backup
+          token: ${{ secrets.GITHUB_TOKEN }}  
+
+      - name: Delete old JAR files and log deletions
+        run: |
+          # Set the cutoff date: 60 days ago (approx. 2 months)
+          CUTOFF_DATE=$(date -d '60 days ago' +%Y%m%d)
+          echo "Cutoff date: $CUTOFF_DATE"
+          
+          # Find .jar files older than 60 days and store in a temporary file
+          find . -type f -name "*.jar" ! -newermt "-60 days" > deleted_files.txt
+          
+          # Check if any files were found
+          if [ -s deleted_files.txt ]; then
+            echo "Files to be deleted:"
+            cat deleted_files.txt
+            # Delete the listed files
+            while IFS= read -r file; do
+              rm -v "$file"
+            done < deleted_files.txt
+          else
+            echo "No .jar files older than 60 days found."
+          fi
+          # Clean up temporary file
+          rm -f deleted_files.txt
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "Auto-delete JAR files older than 2 months"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
