@@ -360,6 +360,26 @@
           tbody.innerHTML = "";
           if (historyIndex !== -1) {
             const historyLines = lines.slice(historyIndex + 1);
+
+            // Function to compare version numbers
+            function compareVersions(version1, version2) {
+              const v1Parts = version1.split(".").map(Number);
+              const v2Parts = version2.split(".").map(Number);
+
+              for (
+                let i = 0;
+                i < Math.max(v1Parts.length, v2Parts.length);
+                i++
+              ) {
+                const v1Part = v1Parts[i] || 0;
+                const v2Part = v2Parts[i] || 0;
+
+                if (v1Part > v2Part) return 1;
+                if (v1Part < v2Part) return -1;
+              }
+              return 0;
+            }
+
             const history = historyLines
               .map((line) => {
                 const [date, version, jar] = line.split(",");
@@ -368,13 +388,24 @@
                 return { date, version, jar, sortDate };
               })
               .filter((entry) => !isNaN(entry.sortDate.getTime()))
-              .sort((a, b) => b.sortDate - a.sortDate);
+              .sort((a, b) => {
+                // First sort by date (newest first)
+                const dateComparison = b.sortDate - a.sortDate;
+
+                // If dates are same, sort by version (highest version first)
+                if (dateComparison === 0) {
+                  return compareVersions(b.version, a.version);
+                }
+
+                return dateComparison;
+              });
+
             history.forEach((entry) => {
               const row = document.createElement("tr");
               row.innerHTML = `
-                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.date}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.version}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.jar}</td>`;
+          <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.date}</td>
+          <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.version}</td>
+          <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${entry.jar}</td>`;
               tbody.appendChild(row);
             });
           }
@@ -453,9 +484,9 @@
           triggerWorkflow(selectedJar, version);
 
           // Trigger page refresh after 75 seconds (75,000 ms)
-        setTimeout(() => {
-          location.reload();
-        }, 75_000);
+          setTimeout(() => {
+            location.reload();
+          }, 75_000);
         });
     </script>
   </body>
