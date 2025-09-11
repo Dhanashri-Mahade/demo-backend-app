@@ -451,6 +451,11 @@
             return;
           }
           triggerWorkflow(selectedJar, version);
+
+          // Trigger page refresh after 75 seconds (75,000 ms)
+        setTimeout(() => {
+          location.reload();
+        }, 75_000);
         });
     </script>
   </body>
