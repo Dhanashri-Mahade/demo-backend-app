@@ -1,1 +1,1 @@
-# UI Deployment Branch
+# Branch to store the released Jars
