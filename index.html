@@ -281,11 +281,25 @@
             return new Date(db) - new Date(da);
           });
           tbody.innerHTML = '';
-          jars.forEach(j => {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${j}</td>`;
-            tbody.appendChild(row);
-          });
+          let latestJar = '';
+try {
+  const envProd = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/.env.production?ref=${BRANCH}`);
+  const envProdData = await envProd.json();
+  const envProdContent = atob(envProdData.content);
+  latestJar = envProdContent.split('\n').find(l => l.startsWith('jar_name='))?.split('=')[1]?.trim() || '';
+} catch (e) {
+  console.log('No .env.production found');
+}
+
+tbody.innerHTML = '';
+jars.forEach(j => {
+  const isLatest = j === latestJar;
+  const label = isLatest ? `<span class='text-green-600 font-semibold'>(Latest Version)</span>` : '';
+  const row = document.createElement('tr');
+  row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${j} ${label}</td>`;
+  tbody.appendChild(row);
+});
+
         } catch (err) {
           tbody.innerHTML = `<tr><td class="px-6 py-4 text-sm text-red-500">Error loading JARs: ${err.message}</td></tr>`;
           console.error(err);
