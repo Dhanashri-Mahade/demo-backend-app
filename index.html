@@ -5,56 +5,194 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyBOQ Deployment</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: center; }
-        .token-section { background: #e8f4fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        input[type="password"] { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
-        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .logout { background: #dc3545; }
-        .tabs { display: flex; margin-bottom: 20px; }
-        .tab-button { flex: 1; padding: 10px; background: #ddd; border: none; cursor: pointer; font-weight: bold; }
-        .tab-button.active { background: #007bff; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .latest-tag { color: #28a745; font-weight: bold; }
-        .deploy-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-        select, input[type="text"] { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
-        #loading { text-align: center; color: #666; }
-        .error { color: #dc3545; text-align: center; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f5f5f5; 
+        }
+        .main-container { 
+            max-width: 100%; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .token-section { 
+            background: #e8f4fd; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+        }
+        .token-section h2 { 
+            margin-top: 0; 
+            color: #333; 
+        }
+        input[type="password"] { 
+            width: 80%; 
+            max-width: 300px; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        button:hover { 
+            background: #0056b3; 
+        }
+        .logout-section { 
+            background: #fff3cd; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            border: 1px solid #ffeaa7; 
+        }
+        .logout-section button { 
+            background: #dc3545; 
+        }
+        .logout-section button:hover { 
+            background: #c82333; 
+        }
+        .logout-section p { 
+            margin: 10px 0 0 0; 
+            color: #856404; 
+        }
+        .history-section { 
+            margin-bottom: 30px; 
+        }
+        .history-section h2 { 
+            color: #333; 
+            margin-bottom: 15px; 
+        }
+        .tabs { 
+            display: flex; 
+            margin-bottom: 15px; 
+            border-bottom: 1px solid #ddd; 
+        }
+        .tab-button { 
+            flex: 1; 
+            padding: 12px; 
+            background: #f8f9fa; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold; 
+            border-bottom: 2px solid transparent; 
+            color: #666; 
+        }
+        .tab-button.active { 
+            background: white; 
+            color: #007bff; 
+            border-bottom-color: #007bff; 
+        }
+        .tab-content { 
+            display: none; 
+            padding: 0; 
+        }
+        .tab-content.active { 
+            display: block; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px; 
+            background: white; 
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px 8px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+            font-weight: bold; 
+            color: #333; 
+        }
+        .latest-tag { 
+            color: #28a745; 
+            font-weight: bold; 
+        }
+        .deploy-section { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 5px; 
+            margin-top: 30px; 
+        }
+        .deploy-section h3 { 
+            color: #333; 
+            margin-top: 0; 
+            margin-bottom: 15px; 
+        }
+        label { 
+            display: block; 
+            margin: 10px 0 5px 0; 
+            font-weight: bold; 
+            color: #333; 
+        }
+        select, input[type="text"] { 
+            width: 100%; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            box-sizing: border-box; 
+        }
+        #loading { 
+            text-align: center; 
+            color: #666; 
+            font-style: italic; 
+        }
+        .error { 
+            color: #dc3545; 
+            text-align: center; 
+            margin: 10px 0; 
+        }
+        #deployStatus { 
+            margin-top: 15px; 
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="main-container">
         <!-- Token Section -->
-        <div class="token-section">
+        <div class="token-section" id="tokenSection">
             <h2>Enter GitHub Personal Access Token</h2>
             <input type="password" id="tokenInput" placeholder="ghp_... (with full repo scope)">
+            <br>
             <button onclick="saveToken()">Save Token</button>
         </div>
 
         <!-- Logout Section -->
-        <div id="logoutSection" style="display: none;">
+        <div id="logoutSection" class="logout-section" style="display: none;">
             <button class="logout" onclick="logout()">Log Out</button>
             <p>Logging out will clear your token.</p>
         </div>
 
         <h1>MyBOQ Deployment</h1>
 
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab-button active" onclick="switchTab('history')">1. Deployment History</button>
-            <button class="tab-button" onclick="switchTab('jars')">2. Available Jars</button>
-        </div>
-
-        <!-- Tab: Deployment History -->
-        <div id="history" class="tab-content active">
+        <!-- Tabs Section for Tables -->
+        <div class="history-section">
             <h2>Deployment History</h2>
-            <div id="historyTableContainer">
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('history')">1. Deployment History</button>
+                <button class="tab-button" onclick="switchTab('jars')">2. Available Jars</button>
+            </div>
+
+            <!-- Tab: Deployment History -->
+            <div id="history" class="tab-content active">
                 <table id="historyTable">
                     <thead>
                         <tr>
@@ -63,35 +201,39 @@
                             <th>JAR Name</th>
                         </tr>
                     </thead>
-                    <tbody id="historyBody"></tbody>
+                    <tbody id="historyBody">
+                        <tr><td colspan="3" id="loading">Loading...</td></tr>
+                    </tbody>
                 </table>
             </div>
-        </div>
 
-        <!-- Tab: Available Jars -->
-        <div id="jars" class="tab-content">
-            <h2>Available Jars for Deployment</h2>
-            <div id="jarsTableContainer">
+            <!-- Tab: Available Jars -->
+            <div id="jars" class="tab-content">
                 <table id="jarsTable">
                     <thead>
                         <tr>
                             <th>JAR Name</th>
                         </tr>
                     </thead>
-                    <tbody id="jarsBody"></tbody>
+                    <tbody id="jarsBody">
+                        <tr><td id="loading">Loading...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
         <!-- Deploy Section -->
         <div class="deploy-section">
-            <h3>Deploy to Server</h3>
-            <label>Select JAR File</label>
+            <h3>Select JAR File</h3>
+            <label for="jarSelect">Select JAR File</label>
             <select id="jarSelect">
                 <option value="">Loading JARs...</option>
             </select>
-            <label>Version Number (e.g., 1.01.02)</label>
+
+            <label for="versionInput">Version Number (e.g., 1.01.02)</label>
             <input type="text" id="versionInput" placeholder="Loading previous version...">
+
+            <br>
             <button onclick="deploy()">Deploy</button>
             <div id="deployStatus"></div>
         </div>
@@ -105,7 +247,7 @@
 
         if (token) {
             document.getElementById('logoutSection').style.display = 'block';
-            document.getElementById('tokenInput').value = token;
+            document.getElementById('tokenSection').style.display = 'none';
             loadData();
         }
 
@@ -114,6 +256,7 @@
             if (token) {
                 localStorage.setItem('githubToken', token);
                 document.getElementById('logoutSection').style.display = 'block';
+                document.getElementById('tokenSection').style.display = 'none';
                 loadData();
             } else {
                 alert('Please enter a valid token');
@@ -124,6 +267,7 @@
             localStorage.removeItem('githubToken');
             token = '';
             document.getElementById('logoutSection').style.display = 'none';
+            document.getElementById('tokenSection').style.display = 'block';
             document.getElementById('tokenInput').value = '';
             location.reload();
         }
@@ -192,7 +336,7 @@
                     `).join('');
                 }
             } catch (err) {
-                document.getElementById('historyTableContainer').innerHTML = `<p class="error">Error loading history: ${err.message}. Check token scopes (needs full repo).</p>`;
+                container.innerHTML = `<tr><td colspan="3" class="error">Error loading history: ${err.message}. Check token scopes (needs full repo).</td></tr>`;
             }
         }
 
@@ -234,7 +378,7 @@
                 }
                 container.innerHTML = html;
             } catch (err) {
-                document.getElementById('jarsTableContainer').innerHTML = `<p class="error">Error loading JARs: ${err.message}. Check token scopes (needs full repo).</p>`;
+                container.innerHTML = `<tr><td class="error">Error loading JARs: ${err.message}. Check token scopes (needs full repo).</td></tr>`;
             }
         }
 
