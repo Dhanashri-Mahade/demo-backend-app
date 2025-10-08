@@ -80,39 +80,34 @@ jobs:
           fi
           echo "JAR_FILE=$(ls target/*.jar)" >> $GITHUB_ENV
 
-      # Step 5: Prepare backup branch and rename old JAR if exists
-      - name: 📂 Prepare backup branch and rename old JAR
+      # NEW Step 5: Prepare backup branch (simplified - no rename logic needed)
+      - name: 📂 Prepare backup branch
         run: |
           echo "STEP_NAME=📂 Prepare backup branch" >> $GITHUB_ENV
           git fetch origin
           git checkout backup || git checkout -b backup
-          if [ -f "MyBOQ.jar" ] && [ -f ".env.production" ]; then
-            OLD_DATE=$(grep '^date=' .env.production | cut -d'=' -f2)
-            if [ -n "$OLD_DATE" ]; then
-              OLD_FILENAME="MyBOQ_${OLD_DATE}.jar"
-              mv MyBOQ.jar "${OLD_FILENAME}"
-              git add "${OLD_FILENAME}"
-              echo "OLD_FILENAME=${OLD_FILENAME}" >> $GITHUB_ENV
-            fi
-          fi
+          # REMOVED: Old rename logic - no MyBOQ.jar exists anymore
 
-      # Step 6: Generate new .env.production with date, version, timestamp
+      # Step 6: Generate new .env.production with date, version, timestamp, and jar_name
       - name: 🏷 Create new .env.production
         run: |
           echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
-          TODAY=$(date +"%Y-%m-%d")
+          TODAY=$(date +"%Y-%m-%d")  # YYYY-MM-DD for JAR naming
           COMMIT_HASH=$(git rev-parse --short HEAD)
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          NEW_JAR="MyBOQ_${TODAY}.jar"  # Generate dated JAR name
           echo "date=$TODAY" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
           echo "timestamp=$TIMESTAMP" >> .env.production
+          echo "jar_name=$NEW_JAR" >> .env.production  # NEW: Store latest JAR name
+          echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV  # Export for next steps
 
-      # Step 7: Copy and rename new JAR to MyBOQ.jar
-      - name: 📦 Add new MyBOQ.jar
+      # Step 7: Copy built JAR to dated format
+      - name: 📦 Add new dated JAR
         run: |
-          echo "STEP_NAME=📦 Add new MyBOQ.jar" >> $GITHUB_ENV
-          cp "${{ env.JAR_FILE }}" MyBOQ.jar
-          git add MyBOQ.jar .env.production
+          echo "STEP_NAME=📦 Add new dated JAR" >> $GITHUB_ENV
+          cp "${{ env.JAR_FILE }}" "${{ env.NEW_JAR }}"  # Copy to dated name only
+          git add "${{ env.NEW_JAR }}" .env.production  # Add dated JAR + env
 
       # Step 8: Commit and push to backup branch
       - name: 🔁 Commit and push
@@ -120,7 +115,7 @@ jobs:
           echo "STEP_NAME=🔁 Commit and push" >> $GITHUB_ENV
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git commit -m "🔁 Backup updated - $(date +"%Y-%m-%d %H:%M:%S")" || true
+          git commit -m "🔁 Backup updated with dated JAR - $(date +"%Y-%m-%d %H:%M:%S") - ${{ env.NEW_JAR }}" || true  # Include JAR name in message
           git push origin backup --force
 
       - name: 🧾 Export notification context
