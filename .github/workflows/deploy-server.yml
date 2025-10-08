@@ -57,59 +57,65 @@ jobs:
             echo "No previous version found."
           fi
 
-      - name: Show user inputs
+      # Step 3: Show user inputs (minor tweak - export original for later)
+      - name: 📝 Show user inputs
         run: |
           echo "STEP_NAME=📝 Show user inputs" >> $GITHUB_ENV
           echo "================================================="
-          echo "User selected JAR file: ${{ github.event.inputs.jar_file }}"
+          echo "User selected JAR file: ${{ github.event.inputs.jar_file }}"  # Original dated JAR
           echo "User entered version: ${{ github.event.inputs.version }}"
           echo "================================================="
+          echo "ORIGINAL_JAR=${{ github.event.inputs.jar_file }}" >> $GITHUB_ENV  # NEW: Export original dated for move/remove
 
-      - name: Select and rename JAR
+      # Step 4: Select and rename JAR (for server only - keep original for Git)
+      - name: 🔄 Select and rename JAR
         run: |
           echo "STEP_NAME=🔄 Select and rename JAR" >> $GITHUB_ENV
-          SELECTED="${{ github.event.inputs.jar_file }}"
+          SELECTED="${{ github.event.inputs.jar_file }}"  # Original dated
           if [ "$SELECTED" != "MyBOQ.jar" ]; then
-            echo "Renaming $SELECTED -> MyBOQ.jar"
-            cp "$SELECTED" MyBOQ.jar
+            echo "Renaming $SELECTED -> MyBOQ.jar (for server upload)"
+            cp "$SELECTED" MyBOQ.jar  # CHANGED: Rename copy for server, original untouched
           else
             echo "Already MyBOQ.jar selected, skipping rename."
           fi
+          echo "SERVER_JAR=MyBOQ.jar" >> $GITHUB_ENV  # NEW: Export renamed for upload/restart
 
-      - name: Update deploy.env with new version
+      # Step 5: Update deploy.env with new version (store original dated in LAST_JAR)
+      - name: 📄 Update deploy.env
         run: |
           echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
           NEW_VERSION=${{ github.event.inputs.version }}
-          NEW_JAR=${{ github.event.inputs.jar_file }}
+          NEW_JAR=${{ github.event.inputs.jar_file }}  # Original dated for history
           DATE=$(date +'%d-%m-%Y')
 
           if [ ! -f deploy.env ]; then
             # File does not exist → create new
             echo "LAST_DATE=$DATE" > deploy.env
             echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
-            echo "LAST_JAR=$NEW_JAR" >> deploy.env
+            echo "LAST_JAR=$NEW_JAR" >> deploy.env  # Original dated
             echo "HISTORY=" >> deploy.env
-            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env  # History with original
           else
             # File exists → update LAST_* and append new history
             sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
             sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$NEW_VERSION/" deploy.env || echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
-            sed -i "s/^LAST_JAR=.*/LAST_JAR=$NEW_JAR/" deploy.env || echo "LAST_JAR=$NEW_JAR" >> deploy.env
+            sed -i "s/^LAST_JAR=.*/LAST_JAR=$NEW_JAR/" deploy.env || echo "LAST_JAR=$NEW_JAR" >> deploy.env  # Original dated
             
             # Append new history line at the end
-            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env  # Original dated in history
           fi
 
-          echo "Updated deploy.env:"
+          echo "Updated deploy.env (LAST_JAR is original dated):"
           cat deploy.env
 
-      - name: Commit and push deploy.env
+      # Step 6: Commit and push deploy.env (unchanged)
+      - name: 📤 Commit and push deploy.env
         run: |
           echo "STEP_NAME=📤 Commit and push deploy.env" >> $GITHUB_ENV
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add deploy.env
-          git commit -m "Update deploy.env with new deployment details: ${{ github.event.inputs.version }}"
+          git commit -m "Update deploy.env with new deployment details: ${{ github.event.inputs.version }} (original JAR: ${{ github.event.inputs.jar_file }})"  # CHANGED: Mention original in message
           git push origin backup
 
       - name: Test SSH Connection (Linux)
@@ -143,7 +149,7 @@ jobs:
       - name: Upload JAR to Linux Server
         run: |
           echo "STEP_NAME=⬆️ Upload JAR to server" >> $GITHUB_ENV
-          echo "Uploading MyBOQ.jar to Linux server..."
+          echo "Uploading MyBOQ.jar (renamed from ${{ github.event.inputs.jar_file }}) to Linux server..."  # UPDATED: Added original JAR reference for tracking
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
 
       - name: Restart MyBOQ App on server with daily log rotation
@@ -170,10 +176,11 @@ jobs:
             
             echo \"📝 Today's log file: \$LOG_FILE\"
             
-            # Add startup entry to log
+            # Add startup entry to log (UPDATED: Added original JAR log)
             echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
             echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🚀 Starting MyBOQ Application\" >> \$LOG_FILE
             echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🏷️  Version: ${{ github.event.inputs.version }}\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 📦 Original JAR: ${{ github.event.inputs.jar_file }}\" >> \$LOG_FILE  # NEW: Log original dated JAR for debugging
             echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🔌 Port: 9090\" >> \$LOG_FILE
             echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
             
@@ -191,7 +198,7 @@ jobs:
               echo \"📂 All logs stored in: ${{ secrets.SERVER_PATH }}/logs/\"
               
               # Show last few lines of today's log
-              echo '--- Last 5 lines of today'\''s log ---'
+              echo '--- Last 5 lines of today''s log ---'
               tail -5 \$LOG_FILE 2>/dev/null || echo 'Log file is being created...'
             else
               echo '❌ Failed to start MyBOQ app!'
@@ -199,24 +206,71 @@ jobs:
             fi
           "
 
+
       - name: Mark deployment as successful
         id: mark_success
         if: success()
         run: echo "deploy_success=true" >> $GITHUB_OUTPUT
 
+
+      # NEW Step: Move original dated JAR to releases & remove from backup (with extra guard)
+      - name: 📦 Move original JAR to releases & remove from backup
+        if: success() && steps.mark_success.outputs.deploy_success == 'true'  # UPDATED: Extra dependency for safety
+        run: |
+          echo "STEP_NAME=📦 Move original to releases & remove from backup" >> $GITHUB_ENV
+          ORIGINAL_JAR="${{ env.ORIGINAL_JAR }}"  # Dated JAR from input (ensure this is set in earlier step)
+          if [ -z "$ORIGINAL_JAR" ]; then
+            echo "ERROR: ORIGINAL_JAR not set, skipping move"
+            exit 1
+          fi
+          
+          # Step 1: Start from backup branch
+          git checkout backup
+          
+          # Step 2: Move to releases branch
+          git fetch origin
+          if git ls-remote --heads origin releases > /dev/null 2>&1; then
+            git checkout releases
+          else
+            git checkout -b releases
+          fi
+          
+          # Ensure original JAR is in releases (copy from backup if needed)
+          if [ ! -f "$ORIGINAL_JAR" ]; then
+            git checkout backup -- "$ORIGINAL_JAR" || echo "Warning: JAR not found in backup"
+          fi
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$ORIGINAL_JAR"
+          git commit -m "Deployed: Added original $ORIGINAL_JAR (v${{ github.event.inputs.version }}) to releases" || true
+          git push origin releases --force
+          
+          # Step 3: Switch back to backup and remove original JAR
+          git checkout backup
+          git rm "$ORIGINAL_JAR"  # Remove dated JAR from backup
+          git commit -m "Removed deployed original JAR $ORIGINAL_JAR (moved to releases, server uses renamed copy)" || true
+          git push origin backup --force
+        # NEW: Add output for debugging
+        shell: bash
+
+      # Updated Summary: Mention both
       - name: Show deployment summary
         if: success()
         run: |
           echo "================================================="
           echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
           echo "================================================="
-          echo "📦 JAR File: ${{ github.event.inputs.jar_file }}"
+          echo "📦 Original JAR: ${{ github.event.inputs.jar_file }} (moved to releases, removed from backup)"
+          echo "📦 Server JAR: MyBOQ.jar (renamed copy uploaded & running)"
           echo "🏷️  Version: ${{ github.event.inputs.version }}"
           echo "🔌 Port: 9090"
           echo "📝 Daily logs: logs/myboq_DD_MM_YY.log"
           echo "🧹 Auto cleanup: Every day at 2 AM (10 days retention)"
           echo "📂 Server path: ${{ secrets.SERVER_PATH }}"
+          echo "📂 Releases branch: https://github.com/Dhanashri-Mahade/demo-backend-app/tree/releases"
           echo "================================================="
+
 
       - name: 🚨 Capture failure step name
         id: capture_failure
