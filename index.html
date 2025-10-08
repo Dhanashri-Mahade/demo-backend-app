@@ -9,48 +9,126 @@
       tailwind.config = { darkMode: "class" };
     </script>
     <style>
-      /* small custom overrides */
+      /* Custom overrides for tab buttons */
+      .tab-button {
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563; /* gray-600 */
+        transition: all 0.2s;
+      }
+      .dark .tab-button {
+        color: #d1d5db; /* gray-300 */
+      }
       .tab-btn-active {
-        @apply bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500;
+        background-color: #ffffff; /* white */
+        color: #5851df; /* indigo-600 */
+        border-bottom: 2px solid #4f46e5; /* indigo-600 */
+        font-weight: 600 !important;
+        font-size: 0.970rem !important;
+      }
+      .dark .tab-btn-active {
+        background-color: #374151; /* gray-700 */
+        color: #818cf8; /* indigo-400 */
+        border-bottom: 2px solid #818cf8; /* indigo-400 */
+      }
+      .tab-button:not(.tab-btn-active):hover {
+        background-color: #e5e7eb; /* gray-200 */
+      }
+      .dark .tab-button:not(.tab-btn-active):hover {
+        background-color: #4b5563; /* gray-600 */
       }
     </style>
   </head>
-  <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+  <body
+    class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen"
+  >
     <!-- Popup Notification -->
-    <div id="popup-notification" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+    <div
+      id="popup-notification"
+      class="fixed inset-0 flex items-center justify-center z-50 hidden"
+    >
       <div class="bg-black bg-opacity-50 absolute inset-0"></div>
-      <div id="popup-content" class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 mx-4 relative z-10 max-w-md w-full text-center">
+      <div
+        id="popup-content"
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 mx-4 relative z-10 max-w-md w-full text-center"
+      >
         <div id="popup-message" class="text-lg font-medium"></div>
       </div>
     </div>
 
     <!-- Token Input Modal -->
-    <div id="token-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h2 class="text-xl font-bold mb-4 text-center">Enter GitHub Personal Access Token</h2>
-        <input type="password" id="token-input" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-        <button id="token-submit" class="mt-4 w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none">Save Token</button>
+    <div
+      id="token-modal"
+      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md"
+      >
+        <h2 class="text-xl font-bold mb-4 text-center">
+          Enter GitHub Personal Access Token
+        </h2>
+        <input
+          type="password"
+          id="token-input"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        />
+        <button
+          id="token-submit"
+          class="mt-4 w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none"
+        >
+          Save Token
+        </button>
       </div>
     </div>
 
     <!-- Top-right controls -->
     <div class="absolute top-4 right-4 flex space-x-3 items-center z-40">
       <!-- Theme Toggle -->
-      <button id="theme-toggle" class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-yellow-300 p-2 rounded-full shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none transition-all">
-        <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M17.293 13.293a8 8 0 11-10.586-10.586 8.001 8.001 0 0010.586 10.586z"/>
+      <button
+        id="theme-toggle"
+        class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-yellow-300 p-2 rounded-full shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none transition-all"
+      >
+        <svg
+          id="theme-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path
+            d="M17.293 13.293a8 8 0 11-10.586-10.586 8.001 8.001 0 0010.586 10.586z"
+          />
         </svg>
       </button>
 
       <!-- Logout -->
       <div class="group relative">
-        <button id="logout-btn" class="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-full shadow-lg hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1"/>
+        <button
+          id="logout-btn"
+          class="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-full shadow-lg hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 transition-all"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1"
+            />
           </svg>
           <span>Log Out</span>
         </button>
-        <div class="absolute right-0 mt-2 w-64 px-3 py-2 bg-black text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+        <div
+          class="absolute right-0 mt-2 w-64 px-3 py-2 bg-black text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+        >
           Logging out will clear your token.
         </div>
       </div>
@@ -63,9 +141,21 @@
 
         <!-- Tabs -->
         <div class="mb-6">
-          <div class="flex space-x-2 bg-gray-50 dark:bg-gray-900 rounded-md p-2">
-            <button id="tab-history-btn" class="tab-button px-4 py-2 rounded-md font-medium text-sm bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500">1. Deployment History</button>
-            <button id="tab-jars-btn" class="tab-button px-4 py-2 rounded-md font-medium text-sm text-gray-600 dark:text-gray-300">2. Available Jars</button>
+          <div
+            class="flex space-x-2 bg-gray-50 dark:bg-gray-900 rounded-md p-2"
+          >
+            <button
+              id="tab-history-btn"
+              class="tab-button tab-btn-active px-4 py-2 rounded-md font-medium text-sm"
+            >
+              Deployment History
+            </button>
+            <button
+              id="tab-jars-btn"
+              class="tab-button px-4 py-2 rounded-md font-medium text-sm"
+            >
+              Available Jars
+            </button>
           </div>
         </div>
 
@@ -74,17 +164,43 @@
           <!-- HISTORY TAB -->
           <div id="tab-history" class="tab-content">
             <h2 class="text-lg font-semibold mb-3">Deployment History</h2>
-            <div class="overflow-y-auto h-64 border border-gray-200 dark:border-gray-700 rounded-md">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <div
+              class="overflow-y-auto h-64 border border-gray-200 dark:border-gray-700 rounded-md"
+            >
+              <table
+                class="min-w-full divide-y divide-gray-200 dark:divide-gray-700"
+              >
                 <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Deploy Date</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Version</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">JAR Name</th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
+                      Deploy Date
+                    </th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
+                      Version
+                    </th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
+                      JAR Name
+                    </th>
                   </tr>
                 </thead>
-                <tbody id="history-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  <tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>
+                <tbody
+                  id="history-table-body"
+                  class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
+                >
+                  <tr>
+                    <td
+                      colspan="3"
+                      class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300"
+                    >
+                      Loading...
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -92,16 +208,35 @@
 
           <!-- JARS TAB -->
           <div id="tab-jars" class="tab-content hidden">
-            <h2 class="text-lg font-semibold mb-3">Available JARs (backup branch)</h2>
-            <div class="overflow-y-auto h-64 border border-gray-200 dark:border-gray-700 rounded-md">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <h2 class="text-lg font-semibold mb-3">
+              Available JARs (backup branch)
+            </h2>
+            <div
+              class="overflow-y-auto h-64 border border-gray-200 dark:border-gray-700 rounded-md"
+            >
+              <table
+                class="min-w-full divide-y divide-gray-200 dark:divide-gray-700"
+              >
                 <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">JAR Name</th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
+                      JAR Name
+                    </th>
                   </tr>
                 </thead>
-                <tbody id="jars-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  <tr><td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>
+                <tbody
+                  id="jars-table-body"
+                  class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
+                >
+                  <tr>
+                    <td
+                      class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300"
+                    >
+                      Loading...
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -111,355 +246,541 @@
         <!-- Deploy Section (same card, below tabs) -->
         <div class="mt-6 bg-gray-50 dark:bg-gray-900 p-4 rounded-md">
           <div class="mb-4">
-            <label for="jar-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Select JAR File</label>
-            <select id="jar-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            <label
+              for="jar-select"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >Select JAR File</label
+            >
+            <select
+              id="jar-select"
+              class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            >
               <option value="">Loading JARs...</option>
             </select>
           </div>
 
           <div class="mb-4">
-            <label for="version-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Version Number (e.g., 1.01.02)</label>
-            <input type="text" id="version-input" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Loading previous version..." />
-            <p id="previous-version" class="text-sm text-gray-500 dark:text-gray-400 mt-1">Loading previous version...</p>
+            <label
+              for="version-input"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >Version Number (e.g., 1.01.02)</label
+            >
+            <input
+              type="text"
+              id="version-input"
+              class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Loading previous version..."
+            />
+            <p
+              id="previous-version"
+              class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+            >
+              Loading previous version...
+            </p>
           </div>
 
           <div class="flex space-x-3">
-            <button id="deploy-btn" class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-2 px-4 rounded-full shadow-lg hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400 transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <button
+              id="deploy-btn"
+              class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-2 px-4 rounded-full shadow-lg hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400 transition-all"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
               <span>Deploy</span>
             </button>
-            <div id="deploy-status" class="flex-1 text-sm text-gray-700 dark:text-gray-300"></div>
+            <div
+              id="deploy-status"
+              class="flex-1 text-sm text-gray-700 dark:text-gray-300"
+            ></div>
           </div>
         </div>
 
-        <div id="extra-output" class="mt-4 text-sm text-gray-700 dark:text-gray-300"></div>
+        <div
+          id="extra-output"
+          class="mt-4 text-sm text-gray-700 dark:text-gray-300"
+        ></div>
       </div>
     </div>
 
     <script>
-  // ----- Configuration -----
-  const REPO_OWNER = 'Dhanashri-Mahade';
-  const REPO_NAME = 'demo-backend-app';
-  const BRANCH = 'backup';  // For file listing; dispatch ref below
+      // ----- Configuration -----
+      const REPO_OWNER = "Dhanashri-Mahade";
+      const REPO_NAME = "demo-backend-app";
+      const BRANCH = "backup"; // For file listing; dispatch ref below
 
-  // ----- Theme toggle ----- (unchanged, your code perfect)
-  const themeToggleBtn = document.getElementById('theme-toggle');
-  const themeIcon = document.getElementById('theme-icon');
+      // ----- Theme toggle ----- (unchanged, your code perfect)
+      const themeToggleBtn = document.getElementById("theme-toggle");
+      const themeIcon = document.getElementById("theme-icon");
 
-  function setTheme(mode) {
-    if (mode === 'dark') {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      themeIcon.innerHTML = `<path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4.22 2.47a1 1 0 011.42 0l.71.7a1 1 0 01-1.42 1.42l-.7-.71a1 1 0 010-1.41zM18 11a1 1 0 100 2h1a1 1 0 100-2h-1zm-2.64 6.36a1 1 0 011.41 1.41l-.7.71a1 1 0 01-1.42-1.42l.71-.7zM11 18a1 1 0 112 0v1a1 1 0 11-2 0v-1zm-7.07-.64a1 1 0 010 1.41l-.71.71a1 1 0 01-1.41-1.42l.7-.7a1 1 0 011.42 0zM4 11a1 1 0 100 2H3a1 1 0 100-2h1zm2.34-6.36a1 1 0 00-1.41-1.41l-.71.7a1 1 0 001.42 1.42l.7-.71zM12 6a6 6 0 100 12 6 6 0 000-12z" clip-rule="evenodd"/>`;
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      themeIcon.innerHTML = `<path d="M17.293 13.293a8 8 0 11-10.586-10.586 8.001 8.001 0 0010.586 10.586z"/>`;
-    }
-  }
-  setTheme(localStorage.getItem('theme') || 'light');
-  themeToggleBtn.addEventListener('click', () => {
-    const current = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
-
-  // ----- Token management (session storage) ----- (unchanged)
-  function getToken() { return sessionStorage.getItem('GITHUB_PAT'); }
-  function setToken(t) { sessionStorage.setItem('GITHUB_PAT', t); }
-  function clearToken() { sessionStorage.removeItem('GITHUB_PAT'); }
-
-  function showTokenModal(){ document.getElementById('token-modal').classList.remove('hidden'); }
-  function hideTokenModal(){ document.getElementById('token-modal').classList.add('hidden'); }
-
-  async function ensureToken(){ 
-    const t = getToken();
-    if (!t) { showTokenModal(); throw new Error('No token'); }
-    return t;
-  }
-
-  // ----- Popup notification ----- (unchanged)
-  function showPopupNotification(message, isSuccess){
-    const popup = document.getElementById('popup-notification');
-    const popupContent = document.getElementById('popup-content');
-    const popupMessage = document.getElementById('popup-message');
-    popupMessage.textContent = message;
-    popupContent.className = 'rounded-lg shadow-xl p-6 mx-4 relative z-10 max-w-md w-full text-center border-l-4 ' + (isSuccess ? 'border-green-500 bg-white dark:bg-gray-800' : 'border-red-500 bg-white dark:bg-gray-800');
-    popupMessage.className = 'text-lg font-medium ' + (isSuccess ? 'text-green-600' : 'text-red-600');
-    popup.classList.remove('hidden');
-    setTimeout(()=> popup.classList.add('hidden'), 4500);
-  }
-
-  // ----- Auth fetch wrapper ----- (updated: better error for 422)
-  async function fetchWithAuth(url, options = {}){
-    const token = await ensureToken();
-    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', ...(options.headers || {}) };
-    const resp = await fetch(url, {...options, headers});
-    if (resp.status === 401) { clearToken(); showTokenModal(); throw new Error('Unauthorized - invalid token'); }
-    if (resp.status === 422) { throw new Error('Workflow dispatch failed: Check if deploy-server.yml exists and has workflow_dispatch trigger'); }  // NEW: Specific 422 handling
-    return resp;
-  }
-
-  // ----- Helpers to parse deploy.env history ----- (unchanged)
-  function parseDeployEnv(contentStr){
-    const lines = contentStr.split('\n').map(l => l.trim());
-    const obj = {};
-    lines.forEach(l => {
-      if (!l) return;
-      const idx = l.indexOf('=');
-      if (idx > -1) {
-        const k = l.substring(0, idx);
-        const v = l.substring(idx+1);
-        obj[k] = v;
+      function setTheme(mode) {
+        if (mode === "dark") {
+          document.documentElement.classList.add("dark");
+          localStorage.setItem("theme", "dark");
+          themeIcon.innerHTML = `<path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4.22 2.47a1 1 0 011.42 0l.71.7a1 1 0 01-1.42 1.42l-.7-.71a1 1 0 010-1.41zM18 11a1 1 0 100 2h1a1 1 0 100-2h-1zm-2.64 6.36a1 1 0 011.41 1.41l-.7.71a1 1 0 01-1.42-1.42l.71-.7zM11 18a1 1 0 112 0v1a1 1 0 11-2 0v-1zm-7.07-.64a1 1 0 010 1.41l-.71.71a1 1 0 01-1.41-1.42l.7-.7a1 1 0 011.42 0zM4 11a1 1 0 100 2H3a1 1 0 100-2h1zm2.34-6.36a1 1 0 00-1.41-1.41l-.71.7a1 1 0 001.42 1.42l.7-.71zM12 6a6 6 0 100 12 6 6 0 000-12z" clip-rule="evenodd"/>`;
+        } else {
+          document.documentElement.classList.remove("dark");
+          localStorage.setItem("theme", "light");
+          themeIcon.innerHTML = `<path d="M17.293 13.293a8 8 0 11-10.586-10.586 8.001 8.001 0 0010.586 10.586z"/>`;
+        }
       }
-    });
-    // HISTORY entries: lines after HISTORY= (each line as DD-MM-YYYY,version,jar)
-    const historyStart = lines.findIndex(l => l === 'HISTORY=');
-    let history = [];
-    if (historyStart !== -1) {
-      const historyLines = lines.slice(historyStart + 1).filter(l => l && !l.startsWith('LAST_') && !l.startsWith('#'));
-      history = historyLines.map(line => {
-        const parts = line.split(',');
-        return { date: parts[0]||'', version: parts[1]||'', jar: parts[2]||'' };
-      }).filter(h => h.date);
-    }
-    return { kv: obj, history };
-  }
-
-  // ----- Load history from deploy.env ----- (unchanged, your code good)
-  async function loadHistory(){
-    const tbody = document.getElementById('history-table-body');
-    tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>';
-    try {
-      const resp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/deploy.env?ref=${BRANCH}`);
-      if (!resp.ok) throw new Error('Failed to fetch deploy.env');
-      const data = await resp.json();
-      const envContent = atob(data.content);
-      const parsed = parseDeployEnv(envContent);
-      let history = parsed.history || [];
-      // Sort by date descending (DD-MM-YYYY format)
-      history.sort((a,b)=>{
-        const [d1,m1,y1] = a.date.split('-');
-        const [d2,m2,y2] = b.date.split('-');
-        const dateA = new Date(`${y1}-${m1}-${d1}`);
-        const dateB = new Date(`${y2}-${m2}-${d2}`);
-        return dateB - dateA;
+      setTheme(localStorage.getItem("theme") || "light");
+      themeToggleBtn.addEventListener("click", () => {
+        const current =
+          localStorage.getItem("theme") === "dark" ? "dark" : "light";
+        setTheme(current === "dark" ? "light" : "dark");
       });
-      if (history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">No deployment history yet.</td></tr>';
-        return;
+
+      // ----- Token management (session storage) ----- (unchanged)
+      function getToken() {
+        return sessionStorage.getItem("GITHUB_PAT");
       }
-      tbody.innerHTML = '';
-      history.forEach(item => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${item.date}</td>
+      function setToken(t) {
+        sessionStorage.setItem("GITHUB_PAT", t);
+      }
+      function clearToken() {
+        sessionStorage.removeItem("GITHUB_PAT");
+      }
+
+      function showTokenModal() {
+        document.getElementById("token-modal").classList.remove("hidden");
+      }
+      function hideTokenModal() {
+        document.getElementById("token-modal").classList.add("hidden");
+      }
+
+      async function ensureToken() {
+        const t = getToken();
+        if (!t) {
+          showTokenModal();
+          throw new Error("No token");
+        }
+        return t;
+      }
+
+      function showHistoryTab() {
+        tabHistory.classList.remove("hidden");
+        tabJars.classList.add("hidden");
+        tabHistoryBtn.classList.add("tab-btn-active");
+        tabJarsBtn.classList.remove("tab-btn-active");
+        loadHistory();
+      }
+
+      function showJarsTab() {
+        tabJars.classList.remove("hidden");
+        tabHistory.classList.add("hidden");
+        tabJarsBtn.classList.add("tab-btn-active");
+        tabHistoryBtn.classList.remove("tab-btn-active");
+        loadJars();
+      }
+
+      // ----- Popup notification ----- (unchanged)
+      function showPopupNotification(message, isSuccess) {
+        const popup = document.getElementById("popup-notification");
+        const popupContent = document.getElementById("popup-content");
+        const popupMessage = document.getElementById("popup-message");
+        popupMessage.textContent = message;
+        popupContent.className =
+          "rounded-lg shadow-xl p-6 mx-4 relative z-10 max-w-md w-full text-center border-l-4 " +
+          (isSuccess
+            ? "border-green-500 bg-white dark:bg-gray-800"
+            : "border-red-500 bg-white dark:bg-gray-800");
+        popupMessage.className =
+          "text-lg font-medium " +
+          (isSuccess ? "text-green-600" : "text-red-600");
+        popup.classList.remove("hidden");
+        setTimeout(() => popup.classList.add("hidden"), 4500);
+      }
+
+      // ----- Auth fetch wrapper ----- (updated: better error for 422)
+      async function fetchWithAuth(url, options = {}) {
+        const token = await ensureToken();
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+          ...(options.headers || {}),
+        };
+        const resp = await fetch(url, { ...options, headers });
+        if (resp.status === 401) {
+          clearToken();
+          showTokenModal();
+          throw new Error("Unauthorized - invalid token");
+        }
+        if (resp.status === 422) {
+          throw new Error(
+            "Workflow dispatch failed: Check if deploy-server.yml exists and has workflow_dispatch trigger"
+          );
+        } // NEW: Specific 422 handling
+        return resp;
+      }
+
+      // ----- Helpers to parse deploy.env history ----- (unchanged)
+      function parseDeployEnv(contentStr) {
+        const lines = contentStr.split("\n").map((l) => l.trim());
+        const obj = {};
+        lines.forEach((l) => {
+          if (!l) return;
+          const idx = l.indexOf("=");
+          if (idx > -1) {
+            const k = l.substring(0, idx);
+            const v = l.substring(idx + 1);
+            obj[k] = v;
+          }
+        });
+        // HISTORY entries: lines after HISTORY= (each line as DD-MM-YYYY,version,jar)
+        const historyStart = lines.findIndex((l) => l === "HISTORY=");
+        let history = [];
+        if (historyStart !== -1) {
+          const historyLines = lines
+            .slice(historyStart + 1)
+            .filter((l) => l && !l.startsWith("LAST_") && !l.startsWith("#"));
+          history = historyLines
+            .map((line) => {
+              const parts = line.split(",");
+              return {
+                date: parts[0] || "",
+                version: parts[1] || "",
+                jar: parts[2] || "",
+              };
+            })
+            .filter((h) => h.date);
+        }
+        return { kv: obj, history };
+      }
+
+      // ----- Load history from deploy.env ----- (unchanged, your code good)
+      async function loadHistory() {
+        const tbody = document.getElementById("history-table-body");
+        tbody.innerHTML =
+          '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>';
+        try {
+          const resp = await fetchWithAuth(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/deploy.env?ref=${BRANCH}`
+          );
+          if (!resp.ok) throw new Error("Failed to fetch deploy.env");
+          const data = await resp.json();
+          const envContent = atob(data.content);
+          const parsed = parseDeployEnv(envContent);
+          let history = parsed.history || [];
+          // Sort by date descending (DD-MM-YYYY format)
+          history.sort((a, b) => {
+            const [d1, m1, y1] = a.date.split("-");
+            const [d2, m2, y2] = b.date.split("-");
+            const dateA = new Date(`${y1}-${m1}-${d1}`);
+            const dateB = new Date(`${y2}-${m2}-${d2}`);
+            return dateB - dateA;
+          });
+          if (history.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">No deployment history yet.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = "";
+          history.forEach((item) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${item.date}</td>
                          <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${item.version}</td>
                          <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${item.jar}</td>`;
-        tbody.appendChild(row);
-      });
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-sm text-red-500">Error loading history: ${err.message}</td></tr>`;
-      console.error(err);
-    }
-  }
-
-  // ----- Load jar list from branch root (files) ----- (updated: latest tag fixed)
-  async function loadJars(){
-    const tbody = document.getElementById('jars-table-body');
-    tbody.innerHTML = '<tr><td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>';
-    try {
-      const resp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/?ref=${BRANCH}`);
-      if (!resp.ok) throw new Error('Failed to list files');
-      const data = await resp.json();
-      let jars = data.filter(f => f.name.endsWith('.jar')).map(f => f.name);
-      if (jars.length === 0) {
-        tbody.innerHTML = '<tr><td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">No JARs available in backup branch.</td></tr>';
-        return;
+            tbody.appendChild(row);
+          });
+        } catch (err) {
+          tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-sm text-red-500">Error loading history: ${err.message}</td></tr>`;
+          console.error(err);
+        }
       }
-      // Get latest jar_name from .env.production
-      let latestJar = '';
-      try {
-        const envProdResp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/.env.production?ref=${BRANCH}`);
-        const envProdData = await envProdResp.json();
-        const envProdContent = atob(envProdData.content);
-        latestJar = envProdContent.split('\n').find(l => l.startsWith('jar_name=')).split('=')[1]?.trim() || '';
-      } catch (e) {
-        console.log('No .env.production found for latest JAR');
+
+      // ----- Load jar list from branch root (files) ----- (updated: latest tag fixed)
+      async function loadJars() {
+        const tbody = document.getElementById("jars-table-body");
+        tbody.innerHTML =
+          '<tr><td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">Loading...</td></tr>';
+        try {
+          const resp = await fetchWithAuth(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/?ref=${BRANCH}`
+          );
+          if (!resp.ok) throw new Error("Failed to list files");
+          const data = await resp.json();
+          let jars = data
+            .filter((f) => f.name.endsWith(".jar"))
+            .map((f) => f.name);
+          if (jars.length === 0) {
+            tbody.innerHTML =
+              '<tr><td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">No JARs available in backup branch.</td></tr>';
+            return;
+          }
+          // Get latest jar_name from .env.production
+          let latestJar = "";
+          try {
+            const envProdResp = await fetchWithAuth(
+              `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/.env.production?ref=${BRANCH}`
+            );
+            const envProdData = await envProdResp.json();
+            const envProdContent = atob(envProdData.content);
+            latestJar =
+              envProdContent
+                .split("\n")
+                .find((l) => l.startsWith("jar_name="))
+                .split("=")[1]
+                ?.trim() || "";
+          } catch (e) {
+            console.log("No .env.production found for latest JAR");
+          }
+          // Sort by date in name (descending)
+          jars.sort((a, b) => {
+            const da =
+              (a.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "0000-00-00";
+            const db =
+              (b.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "0000-00-00";
+            return new Date(db) - new Date(da);
+          });
+          // Move latest to top if found
+          tbody.innerHTML = "";
+          const latestIndex = jars.indexOf(latestJar);
+          if (latestIndex > -1) {
+            const latest = jars.splice(latestIndex, 1)[0];
+            const row = document.createElement("tr");
+            row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300"><span class="text-green-600 font-semibold">${latest}</span> (Latest Version)</td>`;
+            tbody.appendChild(row);
+          }
+          jars.forEach((j) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${j}</td>`;
+            tbody.appendChild(row);
+          });
+        } catch (err) {
+          tbody.innerHTML = `<tr><td class="px-6 py-4 text-sm text-red-500">Error loading JARs: ${err.message}</td></tr>`;
+          console.error(err);
+        }
       }
-      // Sort by date in name (descending)
-      jars.sort((a,b)=>{
-        const da = (a.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'0000-00-00';
-        const db = (b.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'0000-00-00';
-        return new Date(db) - new Date(da);
-      });
-      // Move latest to top if found
-      tbody.innerHTML = '';
-      const latestIndex = jars.indexOf(latestJar);
-      if (latestIndex > -1) {
-        const latest = jars.splice(latestIndex, 1)[0];
-        const row = document.createElement('tr');
-        row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300"><span class="text-green-600 font-semibold">${latest}</span> (Latest Version)</td>`;
-        tbody.appendChild(row);
+
+      // ----- Populate select for deploy ----- (unchanged)
+      async function populateJarSelect() {
+        const sel = document.getElementById("jar-select");
+        sel.innerHTML = '<option value="">Loading JARs...</option>';
+        try {
+          const resp = await fetchWithAuth(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/?ref=${BRANCH}`
+          );
+          if (!resp.ok) throw new Error("Failed to list files");
+          const data = await resp.json();
+          const jars = data
+            .filter((f) => f.name.endsWith(".jar"))
+            .map((f) => f.name);
+          if (jars.length === 0) {
+            sel.innerHTML = '<option value="">No JAR files found</option>';
+            return;
+          }
+          // sort
+          jars.sort((a, b) => {
+            const da =
+              (a.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "0000-00-00";
+            const db =
+              (b.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "0000-00-00";
+            return new Date(db) - new Date(da);
+          });
+          sel.innerHTML = '<option value="">Select a JAR</option>';
+          jars.forEach((j) => {
+            const opt = document.createElement("option");
+            opt.value = j;
+            opt.textContent = j;
+            sel.appendChild(opt);
+          });
+        } catch (err) {
+          sel.innerHTML = '<option value="">Error loading JARs</option>';
+          console.error(err);
+        }
       }
-      jars.forEach(j => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">${j}</td>`;
-        tbody.appendChild(row);
-      });
-    } catch (err) {
-      tbody.innerHTML = `<tr><td class="px-6 py-4 text-sm text-red-500">Error loading JARs: ${err.message}</td></tr>`;
-      console.error(err);
-    }
-  }
 
-  // ----- Populate select for deploy ----- (unchanged)
-  async function populateJarSelect(){
-    const sel = document.getElementById('jar-select');
-    sel.innerHTML = '<option value="">Loading JARs...</option>';
-    try {
-      const resp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/?ref=${BRANCH}`);
-      if (!resp.ok) throw new Error('Failed to list files');
-      const data = await resp.json();
-      const jars = data.filter(f => f.name.endsWith('.jar')).map(f => f.name);
-      if (jars.length === 0) {
-        sel.innerHTML = '<option value="">No JAR files found</option>';
-        return;
+      // ----- Load previous version + history summary ----- (unchanged)
+      async function loadPreviousVersion() {
+        try {
+          const resp = await fetchWithAuth(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/deploy.env?ref=${BRANCH}`
+          );
+          if (!resp.ok) throw new Error("Failed to fetch deploy.env");
+          const data = await resp.json();
+          const parsed = parseDeployEnv(atob(data.content));
+          const kv = parsed.kv || {};
+          const lastVersion = kv["LAST_VERSION"] || "";
+          const lastDate = kv["LAST_DATE"] || "";
+          const lastJar = kv["LAST_JAR"] || "";
+          if (lastVersion) {
+            document.getElementById("version-input").value = lastVersion;
+            document.getElementById(
+              "previous-version"
+            ).textContent = `Previous: ${lastVersion} (deployed on ${
+              lastDate || "unknown"
+            }) with JAR ${lastJar || "unknown"}`;
+          } else {
+            document.getElementById("previous-version").textContent =
+              "Previous version: unknown";
+          }
+        } catch (err) {
+          console.log("No previous version or error:", err.message);
+          document.getElementById("previous-version").textContent =
+            "Previous version: unknown";
+        }
       }
-      // sort
-      jars.sort((a,b)=>{
-        const da = (a.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'0000-00-00';
-        const db = (b.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'0000-00-00';
-        return new Date(db) - new Date(da);
-      });
-      sel.innerHTML = '<option value="">Select a JAR</option>';
-      jars.forEach(j => {
-        const opt = document.createElement('option'); opt.value = j; opt.textContent = j; sel.appendChild(opt);
-      });
-    } catch (err) {
-      sel.innerHTML = '<option value="">Error loading JARs</option>';
-      console.error(err);
-    }
-  }
 
-  // ----- Load previous version + history summary ----- (unchanged)
-  async function loadPreviousVersion(){
-    try {
-      const resp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/deploy.env?ref=${BRANCH}`);
-      if (!resp.ok) throw new Error('Failed to fetch deploy.env');
-      const data = await resp.json();
-      const parsed = parseDeployEnv(atob(data.content));
-      const kv = parsed.kv || {};
-      const lastVersion = kv['LAST_VERSION'] || '';
-      const lastDate = kv['LAST_DATE'] || '';
-      const lastJar = kv['LAST_JAR'] || '';
-      if (lastVersion) {
-        document.getElementById('version-input').value = lastVersion;
-        document.getElementById('previous-version').textContent = `Previous: ${lastVersion} (deployed on ${lastDate || 'unknown'}) with JAR ${lastJar || 'unknown'}`;
-      } else {
-        document.getElementById('previous-version').textContent = 'Previous version: unknown';
+      // ----- Trigger workflow dispatch (deploy) ----- (updated: ref='main' for testing, better error)
+      async function triggerWorkflow(selectedJar, version) {
+        const statusDiv = document.getElementById("deploy-status");
+        statusDiv.innerHTML =
+          '<span class="text-sm text-gray-500 dark:text-gray-300">Triggering deployment...</span>';
+        try {
+          const dispatchRef = "main"; // CHANGED: Use 'main' for dispatch (default branch); change to 'backup' if workflow is there
+          const resp = await fetchWithAuth(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/deploy-server.yml/dispatches`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ref: dispatchRef,
+                inputs: { jar_file: selectedJar, version: version },
+              }),
+            }
+          );
+          if (resp.ok) {
+            showPopupNotification(
+              "Deployment triggered successfully! Check Actions tab.",
+              true
+            );
+            statusDiv.innerHTML =
+              '<span class="text-sm text-green-600">Deployment triggered successfully!</span>';
+            // refresh lists after short delay
+            setTimeout(() => {
+              loadHistory();
+              loadJars();
+              populateJarSelect();
+              loadPreviousVersion();
+            }, 2500);
+          } else {
+            const errText = await resp.text(); // NEW: Log full error for console
+            console.error("Dispatch error details:", errText);
+            const errData = await resp
+              .json()
+              .catch(() => ({ message: resp.statusText }));
+            showPopupNotification(
+              `Failed: ${errData.message || resp.statusText}`,
+              false
+            );
+            statusDiv.innerHTML = `<span class="text-sm text-red-500">Failed to trigger deployment: ${
+              errData.message || resp.statusText
+            }</span>`;
+          }
+        } catch (err) {
+          showPopupNotification(`Error: ${err.message}`, false);
+          statusDiv.innerHTML = `<span class="text-sm text-red-500">Error: ${err.message}</span>`;
+          console.error(err);
+        }
       }
-    } catch (err) {
-      console.log('No previous version or error:', err.message);
-      document.getElementById('previous-version').textContent = 'Previous version: unknown';
-    }
-  }
 
-  // ----- Trigger workflow dispatch (deploy) ----- (updated: ref='main' for testing, better error)
-  async function triggerWorkflow(selectedJar, version){
-    const statusDiv = document.getElementById('deploy-status');
-    statusDiv.innerHTML = '<span class="text-sm text-gray-500 dark:text-gray-300">Triggering deployment...</span>';
-    try {
-      const dispatchRef = 'main';  // CHANGED: Use 'main' for dispatch (default branch); change to 'backup' if workflow is there
-      const resp = await fetchWithAuth(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/deploy-server.yml/dispatches`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: dispatchRef, inputs: { jar_file: selectedJar, version: version } })
-      });
-      if (resp.ok) {
-        showPopupNotification('Deployment triggered successfully! Check Actions tab.', true);
-        statusDiv.innerHTML = '<span class="text-sm text-green-600">Deployment triggered successfully!</span>';
-        // refresh lists after short delay
-        setTimeout(()=> { loadHistory(); loadJars(); populateJarSelect(); loadPreviousVersion(); }, 2500);
-      } else {
-        const errText = await resp.text();  // NEW: Log full error for console
-        console.error('Dispatch error details:', errText);
-        const errData = await resp.json().catch(()=>({message: resp.statusText}));
-        showPopupNotification(`Failed: ${errData.message || resp.statusText}`, false);
-        statusDiv.innerHTML = `<span class="text-sm text-red-500">Failed to trigger deployment: ${errData.message || resp.statusText}</span>`;
+      // ----- Tab switching handlers ----- (unchanged)
+      const tabHistoryBtn = document.getElementById("tab-history-btn");
+      const tabJarsBtn = document.getElementById("tab-jars-btn");
+      const tabHistory = document.getElementById("tab-history");
+      const tabJars = document.getElementById("tab-jars");
+
+      function showHistoryTab() {
+        tabHistory.classList.remove("hidden");
+        tabJars.classList.add("hidden");
+        tabHistoryBtn.classList.add("tab-btn-active");
+        tabJarsBtn.classList.remove("tab-btn-active");
+        loadHistory();
       }
-    } catch (err) {
-      showPopupNotification(`Error: ${err.message}`, false);
-      statusDiv.innerHTML = `<span class="text-sm text-red-500">Error: ${err.message}</span>`;
-      console.error(err);
-    }
-  }
+      function showJarsTab() {
+        tabJars.classList.remove("hidden");
+        tabHistory.classList.add("hidden");
+        tabJarsBtn.classList.add("tab-btn-active");
+        tabHistoryBtn.classList.remove("tab-btn-active");
+        loadJars();
+      }
 
-  // ----- Tab switching handlers ----- (unchanged)
-  const tabHistoryBtn = document.getElementById('tab-history-btn');
-  const tabJarsBtn = document.getElementById('tab-jars-btn');
-  const tabHistory = document.getElementById('tab-history');
-  const tabJars = document.getElementById('tab-jars');
+      tabHistoryBtn.addEventListener("click", showHistoryTab);
+      tabJarsBtn.addEventListener("click", showJarsTab);
 
-  function showHistoryTab(){
-    tabHistory.classList.remove('hidden'); tabJars.classList.add('hidden');
-    tabHistoryBtn.classList.add('tab-btn-active'); tabJarsBtn.classList.remove('tab-btn-active');
-    loadHistory();
-  }
-  function showJarsTab(){
-    tabJars.classList.remove('hidden'); tabHistory.classList.add('hidden');
-    tabJarsBtn.classList.add('tab-btn-active'); tabHistoryBtn.classList.remove('tab-btn-active');
-    loadJars();
-  }
+      // ----- Page load sequence ----- (unchanged)
+      window.onload = async () => {
+        // If token present, hide modal and load data; else show modal
+        if (getToken()) {
+          hideTokenModal();
+          await Promise.all([
+            populateJarSelect(),
+            loadPreviousVersion(),
+            loadHistory(),
+            loadJars(),
+          ]);
+        } else {
+          showTokenModal();
+        }
+      };
 
-  tabHistoryBtn.addEventListener('click', showHistoryTab);
-  tabJarsBtn.addEventListener('click', showJarsTab);
+      // ----- Token modal submit ----- (unchanged)
+      document.getElementById("token-submit").addEventListener("click", () => {
+        const val = document.getElementById("token-input").value.trim();
+        if (!val) {
+          alert("Please enter a token");
+          return;
+        }
+        setToken(val);
+        hideTokenModal();
+        // load
+        populateJarSelect();
+        loadPreviousVersion();
+        loadHistory();
+        loadJars();
+      });
 
-  // ----- Page load sequence ----- (unchanged)
-  window.onload = async () => {
-    // If token present, hide modal and load data; else show modal
-    if (getToken()) {
-      hideTokenModal();
-      await Promise.all([populateJarSelect(), loadPreviousVersion(), loadHistory(), loadJars()]);
-    } else {
-      showTokenModal();
-    }
-  };
+      // ----- Logout button ----- (unchanged)
+      document.getElementById("logout-btn").addEventListener("click", () => {
+        clearToken();
+        showTokenModal();
+        showPopupNotification(
+          "Token cleared. Please enter token to continue.",
+          true
+        );
+      });
 
-  // ----- Token modal submit ----- (unchanged)
-  document.getElementById('token-submit').addEventListener('click', () => {
-    const val = document.getElementById('token-input').value.trim();
-    if (!val) { alert('Please enter a token'); return; }
-    setToken(val);
-    hideTokenModal();
-    // load
-    populateJarSelect(); loadPreviousVersion(); loadHistory(); loadJars();
-  });
+      // ----- Deploy button ----- (unchanged)
+      document
+        .getElementById("deploy-btn")
+        .addEventListener("click", async () => {
+          const selectedJar = document.getElementById("jar-select").value;
+          const version = document.getElementById("version-input").value.trim();
+          if (!selectedJar || !version) {
+            showPopupNotification(
+              "Please select JAR and enter version.",
+              false
+            );
+            return;
+          }
+          await triggerWorkflow(selectedJar, version);
+          // optional refresh after some time (keeps page updated)
+          setTimeout(() => {
+            loadHistory();
+            loadJars();
+            populateJarSelect();
+            loadPreviousVersion();
+          }, 70000);
+        });
 
-  // ----- Logout button ----- (unchanged)
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    clearToken();
-    showTokenModal();
-    showPopupNotification('Token cleared. Please enter token to continue.', true);
-  });
-
-  // ----- Deploy button ----- (unchanged)
-  document.getElementById('deploy-btn').addEventListener('click', async () => {
-    const selectedJar = document.getElementById('jar-select').value;
-    const version = document.getElementById('version-input').value.trim();
-    if (!selectedJar || !version) {
-      showPopupNotification('Please select JAR and enter version.', false);
-      return;
-    }
-    await triggerWorkflow(selectedJar, version);
-    // optional refresh after some time (keeps page updated)
-    setTimeout(()=>{ loadHistory(); loadJars(); populateJarSelect(); loadPreviousVersion(); }, 70000);
-  });
-
-  // allow closing token modal by clicking outside modal content (unchanged)
-  document.getElementById('token-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'token-modal') {
-      // don't auto-close so user must provide token — safer
-    }
-  });
-</script>
+      // allow closing token modal by clicking outside modal content (unchanged)
+      document.getElementById("token-modal").addEventListener("click", (e) => {
+        if (e.target.id === "token-modal") {
+          // don't auto-close so user must provide token — safer
+        }
+      });
+    </script>
   </body>
 </html>
