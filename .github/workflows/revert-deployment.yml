@@ -1,0 +1,306 @@
+name: 🔄 Revert MyBOQ App Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.ctx.outputs.start_time }}
+    steps:
+      - name: 🕒 Set START_TIME
+        id: ctx
+        shell: bash
+        run: |
+          START_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+
+  revert:
+    needs: init
+    runs-on: ubuntu-latest
+    outputs:
+      error_step: ${{ steps.capture_failure.outputs.error_step }}
+      revert_success: ${{ steps.mark_success.outputs.revert_success }}
+    steps:
+      - name: Checkout backup branch
+        uses: actions/checkout@v3
+        with:
+          ref: backup
+
+      - name: 📝 Read previous deployment details from .env.production
+        run: |
+          echo "STEP_NAME=📝 Read previous deployment details" >> $GITHUB_ENV
+          if [ -f .env.production ]; then
+            PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
+            if [ -z "$PREVIOUS_JAR" ] || [ -z "$PREVIOUS_VERSION" ]; then
+              echo "ERROR: Previous deployment details not found in .env.production"
+              exit 1
+            fi
+            echo "PREVIOUS_JAR=$PREVIOUS_JAR" >> $GITHUB_ENV
+            echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_ENV
+            echo "Previous JAR: $PREVIOUS_JAR"
+            echo "Previous Version: $PREVIOUS_VERSION"
+          else
+            echo "ERROR: .env.production file not found"
+            exit 1
+          fi
+
+      - name: Checkout releases branch to access previous JAR
+        run: |
+          echo "STEP_NAME=📦 Checkout releases branch" >> $GITHUB_ENV
+          git fetch origin
+          if git ls-remote --heads origin releases > /dev/null 2>&1; then
+            git checkout releases
+          else
+            echo "ERROR: releases branch does not exist"
+            exit 1
+          fi
+          if [ ! -f "${{ env.PREVIOUS_JAR }}" ]; then
+            echo "ERROR: Previous JAR ${{ env.PREVIOUS_JAR }} not found in releases branch"
+            exit 1
+          fi
+
+      - name: 🔄 Rename previous JAR for server
+        run: |
+          echo "STEP_NAME=🔄 Rename previous JAR for server" >> $GITHUB_ENV
+          cp "${{ env.PREVIOUS_JAR }}" MyBOQ.jar
+          echo "SERVER_JAR=MyBOQ.jar" >> $GITHUB_ENV
+
+      - name: Test SSH Connection (Linux)
+        run: |
+          echo "STEP_NAME=🔗 Test SSH Connection" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo '✅ SSH working on Linux Server'"
+
+      - name: Create target folder and check logs directory
+        run: |
+          echo "STEP_NAME=📁 Create directories" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            mkdir -p ${{ secrets.SERVER_PATH }}
+            if [ -d '${{ secrets.SERVER_PATH }}/logs' ]; then
+              echo '✅ Logs directory already exists'
+            else
+              echo '📁 Creating logs directory...'
+              mkdir -p ${{ secrets.SERVER_PATH }}/logs
+              echo '✅ Logs directory created successfully'
+            fi
+            echo '📂 Directory structure:'
+            ls -la ${{ secrets.SERVER_PATH }}/
+          "
+
+      - name: Upload JAR to Linux Server
+        run: |
+          echo "STEP_NAME=⬆️ Upload JAR to server" >> $GITHUB_ENV
+          echo "Uploading MyBOQ.jar (reverted from ${{ env.PREVIOUS_JAR }}) to Linux server..."
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}/
+
+      - name: Restart MyBOQ App on server with daily log rotation
+        run: |
+          echo "STEP_NAME=🚀 Restart MyBOQ App" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd ${{ secrets.SERVER_PATH }}
+            echo '🔍 Checking if MyBOQ app is already running...'
+            PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$PID\" ]; then
+              echo '⚠️ Found running MyBOQ app (PID:' \$PID '), stopping it...'
+              kill -9 \$PID
+              sleep 3
+              echo '🛑 Previous app stopped successfully'
+            else
+              echo '✅ No running MyBOQ app found, starting fresh.'
+            fi
+            LOG_DATE=\$(date +'%d_%m_%y')
+            LOG_FILE=\"logs/myboq_\${LOG_DATE}.log\"
+            echo \"📝 Today's log file: \$LOG_FILE\"
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🔄 Reverting MyBOQ Application\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🏷️  Version: ${{ env.PREVIOUS_VERSION }}\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 📦 Reverted JAR: ${{ env.PREVIOUS_JAR }}\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] 🔌 Port: 9090\" >> \$LOG_FILE
+            echo \"📅 [\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo '🚀 Starting reverted MyBOQ.jar on port 9090...'
+            nohup java -jar MyBOQ.jar --server.port=9090 >> \$LOG_FILE 2>&1 &
+            sleep 5
+            NEW_PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$NEW_PID\" ]; then
+              echo \"✅ MyBOQ app started successfully (PID: \$NEW_PID)\"
+              echo \"📋 Log file: \$LOG_FILE\"
+              echo \"📂 All logs stored in: ${{ secrets.SERVER_PATH }}/logs/\"
+              echo '--- Last 5 lines of today''s log ---'
+              tail -5 \$LOG_FILE 2>/dev/null || echo 'Log file is being created...'
+            else
+              echo '❌ Failed to start MyBOQ app!'
+              exit 1
+            fi
+          "
+
+      - name: 📦 Move current JAR to backup branch
+        run: |
+          echo "STEP_NAME=📦 Move current JAR to backup" >> $GITHUB_ENV
+          CURRENT_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
+          if [ -z "$CURRENT_JAR" ]; then
+            echo "ERROR: Current JAR not found in .env.production"
+            exit 1
+          fi
+          git checkout releases
+          if [ ! -f "$CURRENT_JAR" ]; then
+            echo "Warning: Current JAR $CURRENT_JAR not found in releases, skipping move"
+          else
+            git checkout backup
+            git checkout releases -- "$CURRENT_JAR"
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add "$CURRENT_JAR"
+            git commit -m "Moved current JAR $CURRENT_JAR back to backup after revert" || true
+            git push origin backup --force
+            git checkout releases
+            git rm "$CURRENT_JAR"
+            git commit -m "Removed current JAR $CURRENT_JAR from releases after revert" || true
+            git push origin releases --force
+          fi
+
+      - name: 📄 Update deploy.env
+        run: |
+          echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
+          DATE=$(date +'%d-%m-%Y')
+          PREVIOUS_JAR="${{ env.PREVIOUS_JAR }}"
+          PREVIOUS_VERSION="${{ env.PREVIOUS_VERSION }}"
+          if [ ! -f deploy.env ]; then
+            echo "LAST_DATE=$DATE" > deploy.env
+            echo "LAST_VERSION=$PREVIOUS_VERSION" >> deploy.env
+            echo "LAST_JAR=$PREVIOUS_JAR" >> deploy.env
+            echo "HISTORY=" >> deploy.env
+            echo "$DATE,$PREVIOUS_VERSION,$PREVIOUS_JAR" >> deploy.env
+          else
+            sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
+            sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$PREVIOUS_VERSION/" deploy.env || echo "LAST_VERSION=$PREVIOUS_VERSION" >> deploy.env
+            sed -i "s/^LAST_JAR=.*/LAST_JAR=$PREVIOUS_JAR/" deploy.env || echo "LAST_JAR=$PREVIOUS_JAR" >> deploy.env
+            echo "$DATE,$PREVIOUS_VERSION,$PREVIOUS_JAR" >> deploy.env
+          fi
+          echo "Updated deploy.env:"
+          cat deploy.env
+          git checkout backup
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add deploy.env
+          git commit -m "Updated deploy.env with reverted deployment: $PREVIOUS_VERSION ($PREVIOUS_JAR)" || true
+          git push origin backup --force
+
+      - name: Mark revert as successful
+        id: mark_success
+        if: success()
+        run: echo "revert_success=true" >> $GITHUB_OUTPUT
+
+      - name: Show revert summary
+        if: success()
+        run: |
+          echo "================================================="
+          echo "🎉 REVERT COMPLETED SUCCESSFULLY!"
+          echo "================================================="
+          echo "📦 Reverted JAR: ${{ env.PREVIOUS_JAR }} (uploaded as MyBOQ.jar)"
+          echo "🏷️  Reverted Version: ${{ env.PREVIOUS_VERSION }}"
+          echo "🔌 Port: 9090"
+          echo "📝 Daily logs: logs/myboq_DD_MM_YY.log"
+          echo "🧹 Auto cleanup: Every day at 2 AM (10 days retention)"
+          echo "📂 Server path: ${{ secrets.SERVER_PATH }}"
+          echo "================================================="
+
+      - name: 🚨 Capture failure step name
+        id: capture_failure
+        if: failure()
+        run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
+
+  notify-success:
+    needs: [init, revert]
+    runs-on: ubuntu-latest
+    if: success() && needs.revert.outputs.revert_success == 'true'
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: 📧 Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Server Revert - SUCCESS ✅"
+          from: "MyBOQ Server Revert <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: |
+            📢 MyBOQ App Server Revert Notification
+
+            Your server deployment has been reverted successfully for MyBOQ App
+
+            Revert Details:
+            📦 JAR File Reverted: ${{ env.PREVIOUS_JAR }}
+            🏷️  Version: ${{ env.PREVIOUS_VERSION }}
+            🔌 Port: 9090
+            📅 Start Time: ${{ needs.init.outputs.start_time }}
+            📅 End Time: ${{ steps.get_end_time.outputs.end_time }}
+            📂 Server Path: ${{ secrets.SERVER_PATH }}
+            Status: ✅ SUCCESS
+
+            Application Features:
+            📝 Daily logs: logs/myboq_DD_MM_YY.log
+            🧹 Auto cleanup: Every day at 2 AM (10 days retention)
+
+            Server Details:
+            🖥️  Server: ${{ secrets.SERVER_IP }}
+            📁 Path: ${{ secrets.SERVER_PATH }}
+
+            ---
+            _Powered by GitHub Actions 🚀_
+
+  notify-failure:
+    needs: [init, revert]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: 📧 Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Server Revert - FAILED ❌"
+          from: "MyBOQ Server Revert <${{ secrets.SMTP_USERNAME }}>"
+          to: "dhanashri.mahade@siliconmount.com"
+          body: |
+            ⚠️ MyBOQ App Server Revert Alert
+
+            Your server revert for MyBOQ App has FAILED ❌
+
+            Revert Details:
+            📦 JAR File: ${{ env.PREVIOUS_JAR }}
+            🏷️  Version: ${{ env.PREVIOUS_VERSION }}
+            📅 Start Time: ${{ needs.init.outputs.start_time }}
+            📅 End Time: ${{ steps.get_end_time.outputs.end_time }}
+            ❌ Failed Step: ${{ needs.revert.outputs.error_step }}
+
+            Common Failure Points:
+            🔗 SSH Connection issues
+            ⬆️  JAR file upload problems
+            🚀 Application restart failures
+            📁 Directory permission issues
+
+            🔍 Check Logs:
+            https://github.com/Dhanashri-Mahade/demo-backend-app/actions
+
+            ---
+            _Powered by GitHub Actions 🚀 — Ensuring transparency in every deployment_
