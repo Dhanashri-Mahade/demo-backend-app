@@ -92,15 +92,33 @@ jobs:
       - name: 🏷 Create new .env.production
         run: |
           echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
-          TODAY=$(date +"%Y-%m-%d")  # YYYY-MM-DD for JAR naming
+          TODAY=$(date +"%d-%m-%Y")  # Use DD-MM-YYYY for date field
+          TODAY_FOR_JAR=$(date +"%Y-%m-%d")  # Use YYYY-MM-DD for JAR name
           COMMIT_HASH=$(git rev-parse --short HEAD)
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-          NEW_JAR="MyBOQ_${TODAY}.jar"  # Generate dated JAR name
+          NEW_JAR="MyBOQ_${TODAY_FOR_JAR}.jar"  # Use YYYY-MM-DD for JAR name (e.g., MyBOQ_2025-10-09.jar)
+          # Read existing .env.production to preserve previous fields
+          if [ -f .env.production ]; then
+            PREVIOUS_DATE=$(grep '^date=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_VERSION=$(grep '^version=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_TIMESTAMP=$(grep '^timestamp=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
+          else
+            PREVIOUS_DATE=""
+            PREVIOUS_VERSION=""
+            PREVIOUS_TIMESTAMP=""
+            PREVIOUS_JAR=""
+          fi
+          # Create new .env.production with current and previous fields
           echo "date=$TODAY" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
           echo "timestamp=$TIMESTAMP" >> .env.production
-          echo "jar_name=$NEW_JAR" >> .env.production  # NEW: Store latest JAR name
-          echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV  # Export for next steps
+          echo "jar_name=$NEW_JAR" >> .env.production
+          echo "previous_date=$PREVIOUS_DATE" >> .env.production
+          echo "previous_version=$PREVIOUS_VERSION" >> .env.production
+          echo "previous_timestamp=$PREVIOUS_TIMESTAMP" >> .env.production
+          echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
+          echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV
 
       # Step 7: Copy built JAR to dated format
       - name: 📦 Add new dated JAR
