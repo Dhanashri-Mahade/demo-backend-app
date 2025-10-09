@@ -97,19 +97,19 @@ jobs:
           COMMIT_HASH=$(git rev-parse --short HEAD)
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           NEW_JAR="MyBOQ_${TODAY_FOR_JAR}.jar"  # Use YYYY-MM-DD for JAR name (e.g., MyBOQ_2025-10-09.jar)
-          # Read existing .env.production to preserve previous fields
+          # Read existing previous_* fields from .env.production to preserve them
           if [ -f .env.production ]; then
-            PREVIOUS_DATE=$(grep '^date=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_VERSION=$(grep '^version=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_TIMESTAMP=$(grep '^timestamp=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_TIMESTAMP=$(grep '^previous_timestamp=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
           else
             PREVIOUS_DATE=""
             PREVIOUS_VERSION=""
             PREVIOUS_TIMESTAMP=""
             PREVIOUS_JAR=""
           fi
-          # Create new .env.production with current and previous fields
+          # Create new .env.production with updated fields and preserved previous fields
           echo "date=$TODAY" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
           echo "timestamp=$TIMESTAMP" >> .env.production
