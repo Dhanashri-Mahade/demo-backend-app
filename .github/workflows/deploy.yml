@@ -160,8 +160,8 @@ jobs:
             Status: ✅ SUCCESS
 
             Files updated in backup branch:
-            1) ${{ env.NEW_JAR }}
-            2) .env.production
+            ${{ env.NEW_JAR }}
+            & .env.production
 
             Path: https://github.com/Dhanashri-Mahade/demo-backend-app/blob/backup/
 
