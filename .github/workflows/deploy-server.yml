@@ -87,19 +87,24 @@ jobs:
           TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
-          # Read previous deployment details from .env.production (if exists)
+          # Read previous deployment details from .env.production (for date, timestamp, jar_name)
           if [ -f .env.production ]; then
             PREVIOUS_DATE=$(grep '^date=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_VERSION=$(grep '^version=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_TIMESTAMP=$(grep '^timestamp=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
           else
             PREVIOUS_DATE=""
-            PREVIOUS_VERSION=""
             PREVIOUS_TIMESTAMP=""
             PREVIOUS_JAR=""
           fi
 
+          # Read previous version from deploy.env (for previous_version)
+          if [ -f deploy.env ]; then
+            PREVIOUS_VERSION=$(grep '^LAST_VERSION=' deploy.env | cut -d'=' -f2 || echo "")
+          else
+            PREVIOUS_VERSION=""
+          fi
+          
           # Update .env.production with current and previous deployment details
           echo "date=$DATE" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
