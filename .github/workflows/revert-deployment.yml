@@ -140,9 +140,15 @@ jobs:
             fi
           "
 
-      - name: 📦 Move current JAR to backup branch
+      - name: 📦 Move current JAR to backup
         run: |
           echo "STEP_NAME=📦 Move current JAR to backup" >> $GITHUB_ENV
+          # Copy .env.production from backup branch to working directory
+          git checkout backup -- .env.production
+          if [ ! -f .env.production ]; then
+            echo "ERROR: .env.production not found in backup branch"
+            exit 1
+          fi
           CURRENT_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
           if [ -z "$CURRENT_JAR" ]; then
             echo "ERROR: Current JAR not found in .env.production"
