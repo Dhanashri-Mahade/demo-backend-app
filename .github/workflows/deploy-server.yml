@@ -84,54 +84,50 @@ jobs:
           NEW_VERSION=${{ github.event.inputs.version }}
           NEW_JAR=${{ github.event.inputs.jar_file }}
           DATE=$(date +'%d-%m-%Y')
-          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
           COMMIT_HASH=$(git rev-parse --short HEAD)
-
-          # Read previous deployment details from .env.production (for date, timestamp, jar_name)
+          # Read previous deployment details from .env.production (for date, jar_name)
           if [ -f .env.production ]; then
             PREVIOUS_DATE=$(grep '^date=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_TIMESTAMP=$(grep '^timestamp=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
           else
             PREVIOUS_DATE=""
-            PREVIOUS_TIMESTAMP=""
             PREVIOUS_JAR=""
           fi
-
-          # Read previous version from deploy.env (for previous_version)
+          # Read second-to-last history entry from deploy.env for previous_version and previous_jar_name
           if [ -f deploy.env ]; then
-            PREVIOUS_VERSION=$(grep '^LAST_VERSION=' deploy.env | cut -d'=' -f2 || echo "")
+            SECOND_LAST_ENTRY=$(tail -n 2 deploy.env | head -n 1)
+            if [ -n "$SECOND_LAST_ENTRY" ]; then
+              PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
+              PREVIOUS_JAR_NAME=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
+            else
+              PREVIOUS_VERSION=""
+              PREVIOUS_JAR_NAME=""
+            fi
           else
             PREVIOUS_VERSION=""
+            PREVIOUS_JAR_NAME=""
           fi
-          
-          # Update .env.production with current and previous deployment details
+          # Update .env.production
           echo "date=$DATE" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
-          echo "timestamp=$TIMESTAMP" >> .env.production
           echo "jar_name=$NEW_JAR" >> .env.production
           echo "previous_date=$PREVIOUS_DATE" >> .env.production
           echo "previous_version=$PREVIOUS_VERSION" >> .env.production
-          echo "previous_timestamp=$PREVIOUS_TIMESTAMP" >> .env.production
-          echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
-
+          echo "previous_jar_name=$PREVIOUS_JAR_NAME" >> .env.production
           echo "Updated .env.production:"
           cat .env.production
-
           # Update deploy.env
           if [ ! -f deploy.env ]; then
             echo "LAST_DATE=$DATE" > deploy.env
             echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
             echo "LAST_JAR=$NEW_JAR" >> deploy.env
             echo "HISTORY=" >> deploy.env
-            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
           else
             sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
             sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$NEW_VERSION/" deploy.env || echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
             sed -i "s/^LAST_JAR=.*/LAST_JAR=$NEW_JAR/" deploy.env || echo "LAST_JAR=$NEW_JAR" >> deploy.env
-            echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
           fi
-
+          echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
           echo "Updated deploy.env:"
           cat deploy.env
 

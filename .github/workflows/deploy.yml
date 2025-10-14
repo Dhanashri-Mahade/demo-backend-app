@@ -88,44 +88,32 @@ jobs:
           git checkout backup || git checkout -b backup
           # REMOVED: Old rename logic - no MyBOQ.jar exists anymore
 
-      # Step 6: Generate new .env.production with date, version, timestamp, and jar_name
+      # Step 6: Generate new .env.production with date, version, and jar_name (no timestamp)
       - name: 🏷 Create new .env.production
         run: |
           echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
           TODAY=$(date +"%d-%m-%Y")  # Use DD-MM-YYYY for date field
           TODAY_FOR_JAR=$(date +"%Y-%m-%d")  # Use YYYY-MM-DD for JAR name
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           NEW_JAR="MyBOQ_${TODAY_FOR_JAR}.jar"  # Use YYYY-MM-DD for JAR name (e.g., MyBOQ_2025-10-09.jar)
-          # Read existing previous_* fields from .env.production to preserve them
+          # Read existing previous_* fields from .env.production to preserve them (without timestamp)
           if [ -f .env.production ]; then
             PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_TIMESTAMP=$(grep '^previous_timestamp=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
           else
             PREVIOUS_DATE=""
             PREVIOUS_VERSION=""
-            PREVIOUS_TIMESTAMP=""
             PREVIOUS_JAR=""
           fi
-          # Create new .env.production with updated fields and preserved previous fields
+          # Create new .env.production with updated fields and preserved previous fields (no timestamp)
           echo "date=$TODAY" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
-          echo "timestamp=$TIMESTAMP" >> .env.production
           echo "jar_name=$NEW_JAR" >> .env.production
           echo "previous_date=$PREVIOUS_DATE" >> .env.production
           echo "previous_version=$PREVIOUS_VERSION" >> .env.production
-          echo "previous_timestamp=$PREVIOUS_TIMESTAMP" >> .env.production
           echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
           echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV
-
-      # Step 7: Copy built JAR to dated format
-      - name: 📦 Add new dated JAR
-        run: |
-          echo "STEP_NAME=📦 Add new dated JAR" >> $GITHUB_ENV
-          cp "${{ env.JAR_FILE }}" "${{ env.NEW_JAR }}"  # Copy to dated name only
-          git add "${{ env.NEW_JAR }}" .env.production  # Add dated JAR + env
 
       # Step 8: Commit and push to backup branch
       - name: 🔁 Commit and push

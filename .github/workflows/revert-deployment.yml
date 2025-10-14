@@ -37,14 +37,17 @@ jobs:
           if [ -f .env.production ]; then
             PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
             PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
-            if [ -z "$PREVIOUS_JAR" ] || [ -z "$PREVIOUS_VERSION" ]; then
+            PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
+            if [ -z "$PREVIOUS_JAR" ] || [ -z "$PREVIOUS_VERSION" ] || [ -z "$PREVIOUS_DATE" ]; then
               echo "ERROR: Previous deployment details not found in .env.production"
               exit 1
             fi
             echo "PREVIOUS_JAR=$PREVIOUS_JAR" >> $GITHUB_ENV
             echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_ENV
+            echo "PREVIOUS_DATE=$PREVIOUS_DATE" >> $GITHUB_ENV
             echo "Previous JAR: $PREVIOUS_JAR"
             echo "Previous Version: $PREVIOUS_VERSION"
+            echo "Previous Date: $PREVIOUS_DATE"
           else
             echo "ERROR: .env.production file not found"
             exit 1
@@ -143,8 +146,7 @@ jobs:
       - name: 📦 Move current JAR to backup
         run: |
           echo "STEP_NAME=📦 Move current JAR to backup" >> $GITHUB_ENV
-          # Copy .env.production from backup branch to working directory
-          git checkout backup -- .env.production
+          git checkout backup
           if [ ! -f .env.production ]; then
             echo "ERROR: .env.production not found in backup branch"
             exit 1
@@ -154,6 +156,7 @@ jobs:
             echo "ERROR: Current JAR not found in .env.production"
             exit 1
           fi
+          echo "CURRENT_JAR=$CURRENT_JAR" >> $GITHUB_ENV
           git checkout releases
           if [ ! -f "$CURRENT_JAR" ]; then
             echo "Warning: Current JAR $CURRENT_JAR not found in releases, skipping move"
@@ -171,31 +174,55 @@ jobs:
             git push origin releases --force
           fi
 
-      - name: 📄 Update deploy.env
+      - name: 📄 Update .env.production and deploy.env
         run: |
-          echo "STEP_NAME=📄 Update deploy.env" >> $GITHUB_ENV
+          echo "STEP_NAME=📄 Update .env.production and deploy.env" >> $GITHUB_ENV
+          git checkout backup
           DATE=$(date +'%d-%m-%Y')
-          PREVIOUS_JAR="${{ env.PREVIOUS_JAR }}"
-          PREVIOUS_VERSION="${{ env.PREVIOUS_VERSION }}"
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          # Read deploy.env to get history and update previous fields
           if [ ! -f deploy.env ]; then
-            echo "LAST_DATE=$DATE" > deploy.env
-            echo "LAST_VERSION=$PREVIOUS_VERSION" >> deploy.env
-            echo "LAST_JAR=$PREVIOUS_JAR" >> deploy.env
-            echo "HISTORY=" >> deploy.env
-            echo "$DATE,$PREVIOUS_VERSION,$PREVIOUS_JAR" >> deploy.env
-          else
-            sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
-            sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$PREVIOUS_VERSION/" deploy.env || echo "LAST_VERSION=$PREVIOUS_VERSION" >> deploy.env
-            sed -i "s/^LAST_JAR=.*/LAST_JAR=$PREVIOUS_JAR/" deploy.env || echo "LAST_JAR=$PREVIOUS_JAR" >> deploy.env
-            echo "$DATE,$PREVIOUS_VERSION,$PREVIOUS_JAR" >> deploy.env
+            echo "ERROR: deploy.env not found in backup branch"
+            exit 1
           fi
+          # Get the second-to-last history entry
+          SECOND_LAST_ENTRY=$(tail -n 2 deploy.env | head -n 1)
+          if [ -z "$SECOND_LAST_ENTRY" ]; then
+            PREVIOUS_DATE=""
+            PREVIOUS_VERSION=""
+            PREVIOUS_JAR=""
+          else
+            PREVIOUS_DATE=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f1)
+            PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
+            PREVIOUS_JAR=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
+          fi
+          # Update .env.production (remove previous_timestamp)
+          echo "date=$DATE" > .env.production
+          echo "version=$COMMIT_HASH" >> .env.production
+          echo "jar_name=${{ env.PREVIOUS_JAR }}" >> .env.production
+          echo "previous_date=$PREVIOUS_DATE" >> .env.production
+          echo "previous_version=$PREVIOUS_VERSION" >> .env.production
+          echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
+          echo "Updated .env.production:"
+          cat .env.production
+          # Update deploy.env (pop last history entry)
+          LAST_ENTRY=$(tail -n 1 deploy.env)
+          if [ -n "$LAST_ENTRY" ]; then
+            sed -i "\|$LAST_ENTRY|d" deploy.env
+          fi
+          echo "LAST_DATE=$DATE" > temp.env
+          echo "LAST_VERSION=${{ env.PREVIOUS_VERSION }}" >> temp.env
+          echo "LAST_JAR=${{ env.PREVIOUS_JAR }}" >> temp.env
+          echo "HISTORY=" >> temp.env
+          grep -v "^LAST_DATE=\|^LAST_VERSION=\|^LAST_JAR=\|^HISTORY=" deploy.env >> temp.env || true
+          echo "$DATE,${{ env.PREVIOUS_VERSION }},${{ env.PREVIOUS_JAR }}" >> temp.env
+          mv temp.env deploy.env
           echo "Updated deploy.env:"
           cat deploy.env
-          git checkout backup
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add deploy.env
-          git commit -m "Updated deploy.env with reverted deployment: $PREVIOUS_VERSION ($PREVIOUS_JAR)" || true
+          git add .env.production deploy.env
+          git commit -m "Updated .env.production and deploy.env with reverted deployment: ${{ env.PREVIOUS_VERSION }} (${{ env.PREVIOUS_JAR }})" || true
           git push origin backup --force
 
       - name: Mark revert as successful
