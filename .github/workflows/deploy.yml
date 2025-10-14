@@ -115,6 +115,13 @@ jobs:
           echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
           echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV
 
+      # Step 7: Copy built JAR to dated format
+      - name: 📦 Add new dated JAR
+        run: |
+          echo "STEP_NAME=📦 Add new dated JAR" >> $GITHUB_ENV
+          cp "${{ env.JAR_FILE }}" "${{ env.NEW_JAR }}"  # Copy to dated name only
+          git add "${{ env.NEW_JAR }}" .env.production  # Add dated JAR + env
+
       # Step 8: Commit and push to backup branch
       - name: 🔁 Commit and push
         run: |
