@@ -196,7 +196,7 @@ jobs:
             PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
             PREVIOUS_JAR=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
           fi
-          # Update .env.production (remove previous_timestamp)
+          # Update .env.production
           echo "date=$DATE" > .env.production
           echo "version=$COMMIT_HASH" >> .env.production
           echo "jar_name=${{ env.PREVIOUS_JAR }}" >> .env.production
@@ -205,7 +205,7 @@ jobs:
           echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
           echo "Updated .env.production:"
           cat .env.production
-          # Update deploy.env (pop last history entry)
+          # Update deploy.env (pop last history entry, update LAST_* fields)
           LAST_ENTRY=$(tail -n 1 deploy.env)
           if [ -n "$LAST_ENTRY" ]; then
             sed -i "\|$LAST_ENTRY|d" deploy.env
@@ -215,7 +215,6 @@ jobs:
           echo "LAST_JAR=${{ env.PREVIOUS_JAR }}" >> temp.env
           echo "HISTORY=" >> temp.env
           grep -v "^LAST_DATE=\|^LAST_VERSION=\|^LAST_JAR=\|^HISTORY=" deploy.env >> temp.env || true
-          echo "$DATE,${{ env.PREVIOUS_VERSION }},${{ env.PREVIOUS_JAR }}" >> temp.env
           mv temp.env deploy.env
           echo "Updated deploy.env:"
           cat deploy.env

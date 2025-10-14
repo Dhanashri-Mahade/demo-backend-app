@@ -85,25 +85,20 @@ jobs:
           NEW_JAR=${{ github.event.inputs.jar_file }}
           DATE=$(date +'%d-%m-%Y')
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          # Read previous deployment details from .env.production (for date, jar_name)
-          if [ -f .env.production ]; then
-            PREVIOUS_DATE=$(grep '^date=' .env.production | cut -d'=' -f2 || echo "")
-            PREVIOUS_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
-          else
-            PREVIOUS_DATE=""
-            PREVIOUS_JAR=""
-          fi
-          # Read second-to-last history entry from deploy.env for previous_version and previous_jar_name
+          # Read second-to-last history entry from deploy.env for all previous_* fields
           if [ -f deploy.env ]; then
             SECOND_LAST_ENTRY=$(tail -n 2 deploy.env | head -n 1)
             if [ -n "$SECOND_LAST_ENTRY" ]; then
+              PREVIOUS_DATE=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f1)
               PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
               PREVIOUS_JAR_NAME=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
             else
+              PREVIOUS_DATE=""
               PREVIOUS_VERSION=""
               PREVIOUS_JAR_NAME=""
             fi
           else
+            PREVIOUS_DATE=""
             PREVIOUS_VERSION=""
             PREVIOUS_JAR_NAME=""
           fi
