@@ -93,9 +93,9 @@ jobs:
         run: |
           echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
           TODAY=$(date +"%d-%m-%Y")  # Use DD-MM-YYYY for date field
-          TODAY_FOR_JAR=$(date +"%Y-%m-%d")  # Use YYYY-MM-DD for JAR name
+          DATE_TIME_FOR_JAR=$(date +"%Y-%m-%d_%H-%M-%S")  # Add timestamp to make JAR unique
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          NEW_JAR="MyBOQ_${TODAY_FOR_JAR}.jar"  # Use YYYY-MM-DD for JAR name (e.g., MyBOQ_2025-10-09.jar)
+          NEW_JAR="MyBOQ_${DATE_TIME_FOR_JAR}.jar"  # e.g., MyBOQ_2025-10-28_14-32-45.jar
           # Read existing previous_* fields from .env.production to preserve them (without timestamp)
           if [ -f .env.production ]; then
             PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
