@@ -1,0 +1,215 @@
+name: 🚀 Upload the Jar file on Github Branch
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '.github/workflows/deploy-server.yml'
+      - '.github/workflows/deploy.yml'           # NEW
+      - '.github/workflows/revert-deployment.yml' # NEW
+  pull_request:
+    branches: [master]
+    types: [closed]
+  workflow_dispatch: # Adds manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.ctx.outputs.start_time }}
+      trigger_type: ${{ steps.ctx.outputs.trigger_type }}
+    steps:
+      - name: 🕒 Set START_TIME and TRIGGER_TYPE
+        id: ctx
+        shell: bash
+        run: |
+          START_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "push" ]; then
+            TRIGGER_TYPE="push"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            TRIGGER_TYPE="manual trigger"
+          elif [ "$EVENT" = "pull_request" ] && [ "${{ github.event.pull_request.merged || false }}" = "true" ]; then
+            TRIGGER_TYPE="merge"
+          else
+            TRIGGER_TYPE="$EVENT"
+          fi
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+
+  build-backup-deploy:
+    needs: init
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    outputs:
+      old_filename: ${{ steps.export_ctx.outputs.old_filename }}
+      error_step: ${{ steps.capture_failure.outputs.error_step }}
+    steps:
+      # Step 1: Checkout master branch code
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "STEP_NAME=📦 Checkout Repository" >> $GITHUB_ENV
+
+      # Step 2: Setup JDK for Maven build
+      - name: ☕ Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+      - run: echo "STEP_NAME=☕ Set up JDK 21" >> $GITHUB_ENV
+
+      # Step 3: Build JAR using Maven
+      - name: 🛠 Build JAR using Maven
+        run: |
+          echo "STEP_NAME=🛠 Build JAR using Maven" >> $GITHUB_ENV
+          mvn clean package -X
+          ls -la target/
+
+      # Step 4: Verify JAR file exists
+      - name: 🔍 Verify JAR file
+        run: |
+          echo "STEP_NAME=🔍 Verify JAR file" >> $GITHUB_ENV
+          if [ ! -f target/*.jar ]; then
+            echo "Error: No JAR file found"
+            exit 1
+          fi
+          echo "JAR_FILE=$(ls target/*.jar)" >> $GITHUB_ENV
+
+      # Step 5: Prepare backup branch
+      - name: 📂 Prepare backup branch
+        run: |
+          echo "STEP_NAME=📂 Prepare backup branch" >> $GITHUB_ENV
+          git fetch origin
+          git checkout backup || git checkout -b backup
+
+      # Step 6: Generate new .env.production with date, version, and jar_name
+      - name: 🏷 Create new .env.production
+        run: |
+          echo "STEP_NAME=🏷 Create new .env.production" >> $GITHUB_ENV
+          TODAY=$(date +"%d-%m-%Y")  # Use DD-MM-YYYY for date field
+          DATE_TIME_FOR_JAR=$(date +"%Y-%m-%d_%H-%M-%S")  # Add timestamp to make JAR unique
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          NEW_JAR="MyBOQ_${DATE_TIME_FOR_JAR}.jar"  # e.g., MyBOQ_2025-10-28_14-32-45.jar
+          # Read existing previous_* fields from .env.production to preserve them
+          if [ -f .env.production ]; then
+            PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
+          else
+            PREVIOUS_DATE=""
+            PREVIOUS_VERSION=""
+            PREVIOUS_JAR=""
+          fi
+          # Create new .env.production with updated fields and preserved previous fields
+          echo "date=$TODAY" > .env.production
+          echo "version=$COMMIT_HASH" >> .env.production
+          echo "jar_name=$NEW_JAR" >> .env.production
+          echo "previous_date=$PREVIOUS_DATE" >> .env.production
+          echo "previous_version=$PREVIOUS_VERSION" >> .env.production
+          echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
+          echo "NEW_JAR=$NEW_JAR" >> $GITHUB_ENV
+
+      # Step 7: Copy built JAR to dated format
+      - name: 📦 Add new dated JAR
+        run: |
+          echo "STEP_NAME=📦 Add new dated JAR" >> $GITHUB_ENV
+          cp "${{ env.JAR_FILE }}" "${{ env.NEW_JAR }}"  # Copy to dated name only
+          git add "${{ env.NEW_JAR }}" .env.production  # Add dated JAR + env
+
+      # Step 8: Commit and push to backup branch
+      - name: 🔁 Commit and push
+        run: |
+          echo "STEP_NAME=🔁 Commit and push" >> $GITHUB_ENV
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -m "🔁 Backup updated with dated JAR - $(date +"%Y-%m-%d %H:%M:%S") - ${{ env.NEW_JAR }}" || true  # Include JAR name in message
+          git push origin backup --force
+
+      - name: 🧾 Export notification context
+        id: export_ctx
+        if: always()
+        run: echo "old_filename=${OLD_FILENAME:-}" >> $GITHUB_OUTPUT
+
+      - name: 🚨 Capture failure step name
+        id: capture_failure
+        if: failure()
+        run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
+
+  # Send success notification on mail
+  notify-success:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: 📧 Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - SUCCESS ✅"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            📢 MyBOQ App Workflow Notification
+
+            Your workflow has been started for MyBOQ App
+
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Status: ✅ SUCCESS
+
+            Files updated in backup branch:
+            ${{ env.NEW_JAR }}
+            & .env.production
+
+            Path: https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/blob/backup/
+
+            ---
+            _Powered by GitHub Actions 🚀_
+
+  # Send failure notification on mail
+  notify-failure:
+    needs: [init, build-backup-deploy]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: 📧 Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "MyBOQ App Workflow - FAILED ❌"
+          from: "MyBOQ Workflow <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            ⚠️ MyBOQ App Workflow Alert
+
+            Your workflow for MyBOQ App has FAILED ❌
+
+            Trigger Type: ${{ needs.init.outputs.trigger_type }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            Error Step: ${{ needs.build-backup-deploy.outputs.error_step }}
+
+            📄 Check Logs:  
+            https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/actions
+
+            ---
+            _Powered by GitHub Actions 🚀 – Ensuring transparency in every build_

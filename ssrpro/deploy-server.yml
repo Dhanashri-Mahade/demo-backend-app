@@ -1,0 +1,338 @@
+name: Deploy on Production Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      jar_file:
+        description: "Enter the .jar filename from backup branch (e.g. MyBOQ_2025-10-28_14-35-42.jar)"
+        required: true
+        type: string
+      version:
+        description: "Enter new version number (e.g. 1.01.02)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.ctx.outputs.start_time }}
+    steps:
+      - name: Set START_TIME
+        id: ctx
+        shell: bash
+        run: |
+          START_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: init
+    runs-on: ubuntu-latest
+    outputs:
+      error_step: ${{ steps.capture_failure.outputs.error_step }}
+      deploy_success: ${{ steps.mark_success.outputs.deploy_success }}
+    steps:
+      - name: Checkout backup branch
+        uses: actions/checkout@v3
+        with:
+          ref: backup
+
+      - name: List available JAR files
+        run: |
+          echo "STEP_NAME=List available JAR files" >> $GITHUB_ENV
+          echo "================================================="
+          echo "Available JAR files in backup branch:"
+          ls -1 *.jar || echo "No JAR files found!"
+          echo "================================================="
+
+      - name: Show previous version
+        run: |
+          echo "STEP_NAME=Show previous version" >> $GITHUB_ENV
+          if [ -f deploy.env ]; then
+            echo "Previous version:"
+            cat deploy.env
+          else
+            echo "No previous version found."
+          fi
+
+      - name: Show user inputs
+        run: |
+          echo "STEP_NAME=Show user inputs" >> $GITHUB_ENV
+          echo "================================================="
+          echo "User selected JAR file: ${{ github.event.inputs.jar_file }}"
+          echo "User entered version: ${{ github.event.inputs.version }}"
+          echo "================================================="
+          echo "ORIGINAL_JAR=${{ github.event.inputs.jar_file }}" >> $GITHUB_ENV
+
+      - name: Select and rename JAR
+        run: |
+          echo "STEP_NAME=Select and rename JAR" >> $GITHUB_ENV
+          SELECTED="${{ github.event.inputs.jar_file }}"
+          if [ "$SELECTED" != "MyBOQ.jar" ]; then
+            echo "Renaming $SELECTED -> MyBOQ.jar (for server upload)"
+            cp "$SELECTED" MyBOQ.jar
+          else
+            echo "Already MyBOQ.jar selected, skipping rename."
+          fi
+          echo "SERVER_JAR=MyBOQ.jar" >> $GITHUB_ENV
+
+      - name: Update .env.production and deploy.env
+        run: |
+          echo "STEP_NAME=Update .env.production and deploy.env" >> $GITHUB_ENV
+          NEW_VERSION=${{ github.event.inputs.version }}
+          NEW_JAR=${{ github.event.inputs.jar_file }}
+          DATE=$(date +'%d-%m-%Y')
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          if [ -f deploy.env ]; then
+            SECOND_LAST_ENTRY=$(tail -n 2 deploy.env | head -n 1)
+            if [ -n "$SECOND_LAST_ENTRY" ]; then
+              PREVIOUS_DATE=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f1)
+              PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
+              PREVIOUS_JAR_NAME=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
+            else
+              PREVIOUS_DATE=""
+              PREVIOUS_VERSION=""
+              PREVIOUS_JAR_NAME=""
+            fi
+          else
+            PREVIOUS_DATE=""
+            PREVIOUS_VERSION=""
+            PREVIOUS_JAR_NAME=""
+          fi
+          echo "date=$DATE" > .env.production
+          echo "version=$COMMIT_HASH" >> .env.production
+          echo "jar_name=$NEW_JAR" >> .env.production
+          echo "previous_date=$PREVIOUS_DATE" >> .env.production
+          echo "previous_version=$PREVIOUS_VERSION" >> .env.production
+          echo "previous_jar_name=$PREVIOUS_JAR_NAME" >> .env.production
+          echo "Updated .env.production:"
+          cat .env.production
+          if [ ! -f deploy.env ]; then
+            echo "LAST_DATE=$DATE" > deploy.env
+            echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
+            echo "LAST_JAR=$NEW_JAR" >> deploy.env
+            echo "HISTORY=" >> deploy.env
+          else
+            sed -i "s/^LAST_DATE=.*/LAST_DATE=$DATE/" deploy.env || echo "LAST_DATE=$DATE" >> deploy.env
+            sed -i "s/^LAST_VERSION=.*/LAST_VERSION=$NEW_VERSION/" deploy.env || echo "LAST_VERSION=$NEW_VERSION" >> deploy.env
+            sed -i "s/^LAST_JAR=.*/LAST_JAR=$NEW_JAR/" deploy.env || echo "LAST_JAR=$NEW_JAR" >> deploy.env
+          fi
+          echo "$DATE,$NEW_VERSION,$NEW_JAR" >> deploy.env
+          echo "Updated deploy.env:"
+          cat deploy.env
+
+      - name: Commit and push .env.production and deploy.env
+        run: |
+          echo "STEP_NAME=Commit and push .env.production and deploy.env" >> $GITHUB_ENV
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .env.production deploy.env
+          git commit -m "Update .env.production and deploy.env with deployment details: ${{ github.event.inputs.version }} (JAR: ${{ github.event.inputs.jar_file }})"
+          git push origin backup
+
+      - name: Test SSH Connection (Linux)
+        run: |
+          echo "STEP_NAME=Test SSH Connection" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH working on Linux Server'"
+
+      - name: Create target folders
+        run: |
+          echo "STEP_NAME=Create directories" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            mkdir -p /root/siliconmount/ssrpro/jar
+            mkdir -p /root/siliconmount/ssrpro/logs
+            echo 'JAR and LOGS directories ready'
+            ls -la /root/siliconmount/ssrpro/
+          "
+
+      - name: Upload JAR to Linux Server
+        run: |
+          echo "STEP_NAME=Upload JAR to server" >> $GITHUB_ENV
+          echo "Uploading MyBOQ.jar to /root/siliconmount/ssrpro/jar/"
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/root/siliconmount/ssrpro/jar/
+
+      - name: Restart MyBOQ App on server with daily log rotation
+        run: |
+          echo "STEP_NAME=Restart MyBOQ App" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd /root/siliconmount/ssrpro/jar
+            echo 'Checking if MyBOQ app is already running...'
+            PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$PID\" ]; then
+              echo 'Stopping previous app (PID: \$PID)...'
+              kill -9 \$PID
+              sleep 3
+              echo 'Previous app stopped'
+            else
+              echo 'No running app found'
+            fi
+            LOG_DATE=\$(date +'%d_%m_%y')
+            LOG_FILE=\"/root/siliconmount/ssrpro/logs/myboq_\${LOG_DATE}.log\"
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Starting MyBOQ Application\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Version: ${{ github.event.inputs.version }}\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Original JAR: ${{ github.event.inputs.jar_file }}\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Port: 8082\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo 'Starting MyBOQ.jar on port 8082...'
+            nohup java -jar MyBOQ.jar --server.port=8082 >> \$LOG_FILE 2>&1 &
+            sleep 5
+            NEW_PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$NEW_PID\" ]; then
+              echo \"MyBOQ app started successfully (PID: \$NEW_PID)\"
+              echo \"Log file: \$LOG_FILE\"
+              tail -5 \$LOG_FILE
+            else
+              echo 'Failed to start MyBOQ app!'
+              exit 1
+            fi
+          "
+
+      - name: Mark deployment as successful
+        id: mark_success
+        if: success()
+        run: echo "deploy_success=true" >> $GITHUB_OUTPUT
+
+      - name: Move original JAR to releases & remove from backup
+        if: success() && steps.mark_success.outputs.deploy_success == 'true'
+        run: |
+          echo "STEP_NAME=Move original to releases & remove from backup" >> $GITHUB_ENV
+          ORIGINAL_JAR="${{ env.ORIGINAL_JAR }}"
+          if [ -z "$ORIGINAL_JAR" ]; then
+            echo "ERROR: ORIGINAL_JAR not set"
+            exit 1
+          fi
+          git checkout backup
+          git fetch origin
+          if git ls-remote --heads origin releases > /dev/null 2>&1; then
+            git checkout releases
+          else
+            git checkout -b releases
+          fi
+          if [ ! -f "$ORIGINAL_JAR" ]; then
+            git checkout backup -- "$ORIGINAL_JAR" || echo "JAR not found in backup"
+          fi
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$ORIGINAL_JAR"
+          git commit -m "Deployed: Added original $ORIGINAL_JAR (v${{ github.event.inputs.version }}) to releases" || true
+          git push origin releases --force
+          git checkout backup
+          git rm "$ORIGINAL_JAR"
+          git commit -m "Removed deployed JAR $ORIGINAL_JAR (moved to releases)" || true
+          git push origin backup --force
+
+      - name: Show deployment summary
+        if: success()
+        run: |
+          echo "================================================="
+          echo "DEPLOYMENT COMPLETED SUCCESSFULLY!"
+          echo "================================================="
+          echo "Original JAR: ${{ github.event.inputs.jar_file }} (moved to releases)"
+          echo "Server JAR: /root/siliconmount/ssrpro/jar/MyBOQ.jar"
+          echo "Version: ${{ github.event.inputs.version }}"
+          echo "Port: 8082"
+          echo "Daily logs: /root/siliconmount/ssrpro/logs/myboq_DD_MM_YY.log"
+          echo "Releases branch: https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/tree/releases"
+          echo "================================================="
+
+      - name: Capture failure step name
+        id: capture_failure
+        if: failure()
+        run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
+
+  notify-success:
+    needs: [init, deploy]
+    runs-on: ubuntu-latest
+    if: success() && needs.deploy.outputs.deploy_success == 'true'
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "SSR-Pro App Server Deployment - SUCCESS"
+          from: "SSR-Pro Deployment <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            SSR-Pro App Server Deployment Notification
+
+            Your server deployment has been completed successfully
+
+            Deployment Details:
+            JAR File Deployed: ${{ github.event.inputs.jar_file }}
+            Version: ${{ github.event.inputs.version }}
+            Port: 8082
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Server Path: /root/siliconmount/ssrpro/jar/
+            Status: SUCCESS
+
+            Application Features:
+            Daily logs: /root/siliconmount/ssrpro/logs/myboq_DD_MM_YY.log
+            Auto cleanup: Every day at 2 AM (10 days retention)
+
+            Server Details:
+            Server: ${{ secrets.SERVER_IP }}
+            JAR Path: /root/siliconmount/ssrpro/jar/
+            Logs Path: /root/siliconmount/ssrpro/logs/
+
+            Releases: https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/tree/releases
+
+            ---
+            _Powered by GitHub Actions_
+
+  notify-failure:
+    needs: [init, deploy]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "SSR-Pro App Server Deployment - FAILED"
+          from: "SSR-Pro Deployment <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            SSR-Pro App Server Deployment Alert
+
+            Your server deployment has FAILED
+
+            Deployment Details:
+            JAR File: ${{ github.event.inputs.jar_file }}
+            Version: ${{ github.event.inputs.version }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Failed Step: ${{ needs.deploy.outputs.error_step }}
+
+            Common Failure Points:
+            SSH Connection issues
+            JAR upload problems
+            Application restart failures
+            Directory permission issues
+
+            Check Logs:  
+            https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/actions
+
+            ---
+            _Powered by GitHub Actions — Ensuring transparency in every deployment_

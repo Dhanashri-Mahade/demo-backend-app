@@ -1,0 +1,331 @@
+name: Revert SSR-Pro App Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.ctx.outputs.start_time }}
+    steps:
+      - name: Set START_TIME
+        id: ctx
+        shell: bash
+        run: |
+          START_TIME=$(TZ=Asia/Kolkata date +"%d-%m-%Y %H:%M")
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+
+  revert:
+    needs: init
+    runs-on: ubuntu-latest
+    outputs:
+      error_step: ${{ steps.capture_failure.outputs.error_step }}
+      revert_success: ${{ steps.mark_success.outputs.revert_success }}
+    steps:
+      - name: Checkout backup branch
+        uses: actions/checkout@v3
+        with:
+          ref: backup
+
+      - name: Read previous deployment details from .env.production
+        run: |
+          echo "STEP_NAME=Read previous deployment details" >> $GITHUB_ENV
+          if [ -f .env.production ]; then
+            PREVIOUS_JAR=$(grep '^previous_jar_name=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_VERSION=$(grep '^previous_version=' .env.production | cut -d'=' -f2 || echo "")
+            PREVIOUS_DATE=$(grep '^previous_date=' .env.production | cut -d'=' -f2 || echo "")
+            if [ -z "$PREVIOUS_JAR" ] || [ -z "$PREVIOUS_VERSION" ] || [ -z "$PREVIOUS_DATE" ]; then
+              echo "ERROR: Previous deployment details not found in .env.production"
+              exit 1
+            fi
+            echo "PREVIOUS_JAR=$PREVIOUS_JAR" >> $GITHUB_ENV
+            echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_ENV
+            echo "PREVIOUS_DATE=$PREVIOUS_DATE" >> $GITHUB_ENV
+            echo "Previous JAR: $PREVIOUS_JAR"
+            echo "Previous Version: $PREVIOUS_VERSION"
+            echo "Previous Date: $PREVIOUS_DATE"
+          else
+            echo "ERROR: .env.production file not found"
+            exit 1
+          fi
+
+      - name: Checkout releases branch to access previous JAR
+        run: |
+          echo "STEP_NAME=Checkout releases branch" >> $GITHUB_ENV
+          git fetch origin
+          if git ls-remote --heads origin releases > /dev/null 2>&1; then
+            git checkout releases
+          else
+            echo "ERROR: releases branch does not exist"
+            exit 1
+          fi
+          if [ ! -f "${{ env.PREVIOUS_JAR }}" ]; then
+            echo "ERROR: Previous JAR ${{ env.PREVIOUS_JAR }} not found in releases branch"
+            exit 1
+          fi
+
+      - name: Rename previous JAR for server
+        run: |
+          echo "STEP_NAME=Rename previous JAR for server" >> $GITHUB_ENV
+          cp "${{ env.PREVIOUS_JAR }}" MyBOQ.jar
+          echo "SERVER_JAR=MyBOQ.jar" >> $GITHUB_ENV
+
+      - name: Test SSH Connection (Linux)
+        run: |
+          echo "STEP_NAME=Test SSH Connection" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH working on Linux Server'"
+
+      - name: Create target folders
+        run: |
+          echo "STEP_NAME=Create directories" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            mkdir -p ${{ secrets.SERVER_PATH }}jar
+            mkdir -p ${{ secrets.SERVER_PATH }}logs
+            echo 'JAR and LOGS directories ready'
+            ls -la ${{ secrets.SERVER_PATH }}
+          "
+
+      - name: Upload JAR to Linux Server
+        run: |
+          echo "STEP_NAME=Upload JAR to server" >> $GITHUB_ENV
+          echo "Uploading MyBOQ.jar (reverted from ${{ env.PREVIOUS_JAR }}) to ${{ secrets.SERVER_PATH }}jar/"
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -o StrictHostKeyChecking=no MyBOQ.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.SERVER_PATH }}jar/
+
+      - name: Restart SSR-Pro App on server with daily log rotation
+        run: |
+          echo "STEP_NAME=Restart SSR-Pro App" >> $GITHUB_ENV
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd ${{ secrets.SERVER_PATH }}jar
+            echo 'Checking if SSR-Pro app is already running...'
+            PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$PID\" ]; then
+              echo 'Stopping previous app (PID: \$PID)...'
+              kill -9 \$PID
+              sleep 3
+              echo 'Previous app stopped'
+            else
+              echo 'No running app found'
+            fi
+            LOG_DATE=\$(date +'%d_%m_%y')
+            LOG_FILE=\"${{ secrets.SERVER_PATH }}logs/myboq_\${LOG_DATE}.log\"
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Reverting SSR-Pro Application\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Version: ${{ env.PREVIOUS_VERSION }}\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Reverted JAR: ${{ env.PREVIOUS_JAR }}\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] Port: 8082\" >> \$LOG_FILE
+            echo \"[\$(date +'%Y-%m-%d %H:%M:%S')] ========================================\" >> \$LOG_FILE
+            echo 'Starting reverted MyBOQ.jar on port 8082...'
+            nohup java -jar MyBOQ.jar --server.port=8082 >> \$LOG_FILE 2>&1 &
+            sleep 5
+            NEW_PID=\$(ps -ef | grep 'MyBOQ.jar' | grep -v grep | awk '{print \$2}')
+            if [ ! -z \"\$NEW_PID\" ]; then
+              echo \"SSR-Pro app started successfully (PID: \$NEW_PID)\"
+              echo \"Log file: \$LOG_FILE\"
+              tail -5 \$LOG_FILE
+            else
+              echo 'Failed to start SSR-Pro app!'
+              exit 1
+            fi
+          "
+
+      - name: Move current JAR back to backup
+        run: |
+          echo "STEP_NAME=Move current JAR to backup" >> $GITHUB_ENV
+          git checkout backup
+          if [ ! -f .env.production ]; then
+            echo "ERROR: .env.production not found in backup branch"
+            exit 1
+          fi
+          CURRENT_JAR=$(grep '^jar_name=' .env.production | cut -d'=' -f2 || echo "")
+          if [ -z "$CURRENT_JAR" ]; then
+            echo "ERROR: Current JAR not found in .env.production"
+            exit 1
+          fi
+          echo "CURRENT_JAR=$CURRENT_JAR" >> $GITHUB_ENV
+          git checkout releases
+          if [ ! -f "$CURRENT_JAR" ]; then
+            echo "Warning: Current JAR $CURRENT_JAR not found in releases, skipping move"
+          else
+            git checkout backup
+            git checkout releases -- "$CURRENT_JAR"
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add "$CURRENT_JAR"
+            git commit -m "Moved current JAR $CURRENT_JAR back to backup after revert" || true
+            git push origin backup --force
+            git checkout releases
+            git rm "$CURRENT_JAR"
+            git commit -m "Removed current JAR $CURRENT_JAR from releases after revert" || true
+            git push origin releases --force
+          fi
+
+      - name: Update .env.production and deploy.env
+        run: |
+          echo "STEP_NAME=Update .env.production and deploy.env" >> $GITHUB_ENV
+          git checkout backup
+          DATE=$(date +'%d-%m-%Y')
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          if [ ! -f deploy.env ]; then
+            echo "ERROR: deploy.env not found in backup branch"
+            exit 1
+          fi
+          SECOND_LAST_ENTRY=$(tail -n 2 deploy.env | head -n 1)
+          if [ -z "$SECOND_LAST_ENTRY" ]; then
+            PREVIOUS_DATE=""
+            PREVIOUS_VERSION=""
+            PREVIOUS_JAR=""
+          else
+            PREVIOUS_DATE=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f1)
+            PREVIOUS_VERSION=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f2)
+            PREVIOUS_JAR=$(echo "$SECOND_LAST_ENTRY" | cut -d',' -f3)
+          fi
+          echo "date=$DATE" > .env.production
+          echo "version=$COMMIT_HASH" >> .env.production
+          echo "jar_name=${{ env.PREVIOUS_JAR }}" >> .env.production
+          echo "previous_date=$PREVIOUS_DATE" >> .env.production
+          echo "previous_version=$PREVIOUS_VERSION" >> .env.production
+          echo "previous_jar_name=$PREVIOUS_JAR" >> .env.production
+          echo "Updated .env.production:"
+          cat .env.production
+          LAST_ENTRY=$(tail -n 1 deploy.env)
+          if [ -n "$LAST_ENTRY" ]; then
+            sed -i "\|$LAST_ENTRY|d" deploy.env
+          fi
+          echo "LAST_DATE=$DATE" > temp.env
+          echo "LAST_VERSION=${{ env.PREVIOUS_VERSION }}" >> temp.env
+          echo "LAST_JAR=${{ env.PREVIOUS_JAR }}" >> temp.env
+          echo "HISTORY=" >> temp.env
+          grep -v "^LAST_DATE=\|^LAST_VERSION=\|^LAST_JAR=\|^HISTORY=" deploy.env >> temp.env || true
+          mv temp.env deploy.env
+          echo "Updated deploy.env:"
+          cat deploy.env
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .env.production deploy.env
+          git commit -m "Updated .env.production and deploy.env with reverted deployment: ${{ env.PREVIOUS_VERSION }} (${{ env.PREVIOUS_JAR }})" || true
+          git push origin backup --force
+
+      - name: Mark revert as successful
+        id: mark_success
+        if: success()
+        run: echo "revert_success=true" >> $GITHUB_OUTPUT
+
+      - name: Show revert summary
+        if: success()
+        run: |
+          echo "================================================="
+          echo "REVERT COMPLETED SUCCESSFULLY!"
+          echo "================================================="
+          echo "Reverted JAR: ${{ env.PREVIOUS_JAR }} (uploaded as MyBOQ.jar)"
+          echo "Reverted Version: ${{ env.PREVIOUS_VERSION }}"
+          echo "Port: 8082"
+          echo "Daily logs: ${{ secrets.SERVER_PATH }}logs/myboq_DD_MM_YY.log"
+          echo "Releases: https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/tree/releases"
+          echo "================================================="
+
+      - name: Capture failure step name
+        id: capture_failure
+        if: failure()
+        run: echo "error_step=${STEP_NAME:-Unknown}" >> $GITHUB_OUTPUT
+
+  notify-success:
+    needs: [init, revert]
+    runs-on: ubuntu-latest
+    if: success() && needs.revert.outputs.revert_success == 'true'
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: Send success email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "SSR-Pro App Server Revert - SUCCESS"
+          from: "SSR-Pro Revert <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            SSR-Pro App Server Revert Notification
+
+            Your server deployment has been reverted successfully
+
+            Revert Details:
+            JAR File Reverted: ${{ env.PREVIOUS_JAR }}
+            Version: ${{ env.PREVIOUS_VERSION }}
+            Port: 8082
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Server JAR Path: ${{ secrets.SERVER_PATH }}jar/
+            Status: SUCCESS
+
+            Application Features:
+            Daily logs: ${{ secrets.SERVER_PATH }}logs/myboq_DD_MM_YY.log
+            Auto cleanup: Every day at 2 AM (10 days retention)
+
+            Server Details:
+            Server: ${{ secrets.SERVER_IP }}
+            JAR Path: ${{ secrets.SERVER_PATH }}jar/
+            Logs Path: ${{ secrets.SERVER_PATH }}logs/
+
+            Releases: https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/tree/releases
+
+            ---
+            _Powered by GitHub Actions_
+
+  notify-failure:
+    needs: [init, revert]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Get End Time
+        id: get_end_time
+        run: echo "end_time=$(TZ=Asia/Kolkata date '+%d-%m-%Y %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.titan.email
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "SSR-Pro App Server Revert - FAILED"
+          from: "SSR-Pro Revert <${{ secrets.SMTP_USERNAME }}>"
+          to: ${{ secrets.MAIL_TO }}
+          body: |
+            SSR-Pro App Server Revert Alert
+
+            Your server revert has FAILED
+
+            Revert Details:
+            JAR File: ${{ env.PREVIOUS_JAR }}
+            Version: ${{ env.PREVIOUS_VERSION }}
+            Start Time: ${{ needs.init.outputs.start_time }}
+            End Time: ${{ steps.get_end_time.outputs.end_time }}
+            Failed Step: ${{ needs.revert.outputs.error_step }}
+
+            Common Failure Points:
+            SSH Connection issues
+            JAR upload problems
+            Application restart failures
+            Directory permission issues
+
+            Server Paths:
+            JAR: ${{ secrets.SERVER_PATH }}jar/
+            Logs: ${{ secrets.SERVER_PATH }}logs/
+
+            Check Logs:
+            https://github.com/SiliconMount-Tech-Services-Pvt-Ltd/SSR-Pro/actions
+
+            ---
+            _Powered by GitHub Actions — Ensuring transparency in every deployment_
