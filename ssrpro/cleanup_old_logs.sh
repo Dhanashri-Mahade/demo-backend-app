@@ -19,7 +19,7 @@ DELETED_COUNT=$(find "$LOG_DIR"/ -name "$LOG_PATTERN" -mtime +9 -print | wc -l)
 
 if [ "$DELETED_COUNT" -gt 0 ]; then
   echo "🗑️  Deleting $DELETED_COUNT old log files..."
-  find "$LOG_DIR"/ -name "$LOG_PATTERN" -mtime +10 -delete
+  find "$LOG_DIR"/ -name "$LOG_PATTERN" -mtime +9 -delete
   echo "✅ Cleaned up $DELETED_COUNT log files older than 10 days"
 else
   echo "✅ No old log files to delete"
