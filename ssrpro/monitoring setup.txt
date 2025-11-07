@@ -1,0 +1,31 @@
+ sudo yum install -y s-nail
+Last metadata expiration check: 1:31:13 ago on Fri 07 Nov 2025 12:28:06 PM UTC.
+Package s-nail-14.9.22-6.el9.x86_64 is already installed.
+Dependencies resolved.
+Nothing to do.
+Complete!
+
+
+[root@srv834068 ~]# sudo nano /etc/mail.rc
+[root@srv834068 ~]# cat /etc/mail.rc
+set smtp-use-starttls
+set smtp=smtps://smtp.titan.email:465
+set smtp-auth=login
+set smtp-auth-user=github-wfl@myboq.in
+set smtp-auth-password=Github$2025
+set from="Server Monitor Siliconmount <github-wfl@myboq.in>"
+set realname="Server Monitor Siliconmount"
+set use-from
+set envelope-from
+
+[root@srv834068 ~]#
+
+
+sudo nano /root/siliconmount/scripts/monitor_services.sh
+
+#add script here
+
+sudo chmod +x /root/siliconmount/monitor_services.sh
+
+
+
